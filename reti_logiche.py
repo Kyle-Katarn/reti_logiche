@@ -120,19 +120,19 @@ class NOR(Port):
         self.pin_2 = self.pin_2_Port.result
 
 class NOT(Port):
-    def __init__(self, pin_Port:Port, name: str = "NOT"):
+    def __init__(self, pin_1_Port:Port, name: str = "NOT"):
         super().__init__()
         self.name = name
         self.pin: bool = False
-        self.pin_Port:Port = pin_Port
-        pin_Port.output_to_ports.add(self)
+        self.pin_1_Port:Port = pin_1_Port
+        pin_1_Port.output_to_ports.add(self)
         
     def execute(self):
         self.result = not self.pin
         super().execute()
 
     def set_pin_values(self):
-        self.pin = self.pin_Port.result
+        self.pin = self.pin_1_Port.result
 
 #setti la porta in input ad un pin di B, A contiene B nella lista delle porte di output
 
@@ -144,9 +144,8 @@ false_obj = PortFalse()
 ports_to_execute.append(true_obj)
 ports_to_execute.append(false_obj)
 
-and1 = AND(true_obj, true_obj)
-print(and1);
-or1 = OR(and1, false_obj)
+not1 = NOT(true_obj)
+not2 = NOT(false_obj)
 
 print("////////////////////////////////////////////////////////////////////////")
 

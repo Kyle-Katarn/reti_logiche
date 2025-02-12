@@ -121,7 +121,7 @@ def ordinamento_topologico(lista_porte: list[Port]):
 def create_visual_ports(lista_porte: list[Port]):
     lista_porte_ordinata:list[Port] = ordinamento_topologico(lista_porte)
     lista_porte_ordinata.reverse()
-    print("lista_porte_ordinata: ", lista_porte_ordinata)
+    #print("lista_porte_ordinata: ", lista_porte_ordinata)
     visual_ports = []
     x, y = -100, 50
     dict_logic_to_visual_ports:dict[Port, VisualPort] = {}
@@ -137,30 +137,18 @@ def create_visual_ports(lista_porte: list[Port]):
             previus_port_level = dict_port_to_BFS_level[child_port]
             
         #print("child_port: ", child_port, " level: ", dict_port_to_BFS_level[child_port])
-        visual_child_Port = dict_logic_to_visual_ports.get(child_port)
-        if visual_child_Port is None:
-            visual_child_Port = VisualPort(child_port, x, y)
-            dict_logic_to_visual_ports[child_port] = visual_child_Port
-            visual_ports.append(visual_child_Port)
+        visual_child_Port = VisualPort(child_port, x, y)
+        dict_logic_to_visual_ports[child_port] = visual_child_Port
+        visual_ports.append(visual_child_Port)
 
         if not isinstance(child_port, (PortTrue, PortFalse)):
             pin_1_Port = child_port.pin_1_Port
             visual_pin_1_Port = dict_logic_to_visual_ports.get(pin_1_Port)
-            if visual_pin_1_Port is None:
-                visual_pin_1_Port = VisualPort(pin_1_Port, x, y)
-                dict_logic_to_visual_ports[pin_1_Port] = visual_pin_1_Port
-                visual_ports.append(visual_pin_1_Port)
-            
             visual_pin_1_Port.add_connection(visual_child_Port, 1)
 
             if isinstance(child_port, (AND, OR, NAND, NOR)):
                 pin_2_Port = child_port.pin_2_Port
                 visual_pin_2_Port = dict_logic_to_visual_ports.get(pin_2_Port)
-                if visual_pin_2_Port is None:
-                    visual_pin_2_Port = VisualPort(pin_2_Port, x, y)
-                    dict_logic_to_visual_ports[pin_2_Port] = visual_pin_2_Port
-                    visual_ports.append(visual_pin_2_Port)
-
                 visual_pin_2_Port.add_connection(visual_child_Port, 2)
 
     return visual_ports
