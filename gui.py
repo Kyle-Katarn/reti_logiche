@@ -94,15 +94,10 @@ class VisualPort:
 
 
 
-'''
-PROB NON SERVE A NIENTE
-parti dall'ultimo nodo dello stack, crei la sua classe visual
-crei la classe visual per le porte padre e le connetti
-riparti dal padre e ripeti
-'''
+
 def ordinamento_topologico_helper(port: Port, stack: list[Port], visited: set[Port]):
     visited.add(port)
-    for child_port in port.output_to_ports:
+    for child_port in port.child_ports_list:
         if child_port not in visited:
             ordinamento_topologico_helper(child_port, stack, visited)
     stack.append(port)
@@ -117,13 +112,40 @@ def ordinamento_topologico(lista_porte: list[Port]):
     return stack
 
 
+def get_ports_level_BFS():
+    dict_port_to_BFS_level: Dict[Port, int] = {}
+    current_level_ports = set()
+    next_level_ports = set()
+    current_level_ports.add(GlOBAL_TRUE)
+    current_level_ports.add(GlOBAL_FALSE)
+    level = 0
+    
+    # Initialize first level
+    for port in current_level_ports:
+        dict_port_to_BFS_level[port] = level
 
-def create_visual_ports(lista_porte: list[Port]):
+    while len(current_level_ports) > 0:
+        current_port = current_level_ports.pop()
+        next_level_ports.update(current_port.get_child_ports_list())
+
+        if len(current_level_ports) == 0:
+            level += 1
+            # Set level for all ports in next_level
+            for port in next_level_ports:
+                dict_port_to_BFS_level[port] = level
+            current_level_ports = next_level_ports.copy()
+            next_level_ports.clear()
+    
+    return dict_port_to_BFS_level
+
+
+def create_visual_ports(lista_porte: list[Port], dict_port_to_BFS_level: dict[Port, int]):
     lista_porte_ordinata:list[Port] = ordinamento_topologico(lista_porte)
     lista_porte_ordinata.reverse()
     #print("lista_porte_ordinata: ", lista_porte_ordinata)
     visual_ports = []
     x, y = -100, 50
+    
     dict_logic_to_visual_ports:dict[Port, VisualPort] = {}
 
     previus_port_level:int = -1
@@ -155,7 +177,10 @@ def create_visual_ports(lista_porte: list[Port]):
         
 
 
-visual_ports:list[VisualPort] = create_visual_ports(all_ports_list)
+
+dict_port_to_BFS_level:dict[Port, int] = get_ports_level_BFS()
+lista_ordinata:list[Port] = ordinamento_topologico(GLOBAL_ALL_PORTS_LIST)
+visual_ports:list[VisualPort] = create_visual_ports(lista_ordinata, dict_port_to_BFS_level)
 
 # Main game loop
 running = True

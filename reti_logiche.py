@@ -1,32 +1,30 @@
 from typing import Dict
-
-ports_to_execute:"Port" =  []
-set_child_ports_pins: list[callable] = [] 
 '''
-the pins of the ports that are children of the "ports_to_execute" of a level of the BFS are set ath the END of the level
-(when all ports of ports_to_execute have been executed)
+Una porta sia aggiunge al livello N se uno dei suoi pin dipende da una porta al livello N-1
+NON è necessario che tutti i pin dipendano da porte al livello N-1
 '''
 
-all_ports_list:"Port" = []
+GLOBAL_ALL_PORTS_LIST:"Port" = []
 
 class Port:
     def __init__(self, name: str = "Port"):
-        all_ports_list.append(self)
+        GLOBAL_ALL_PORTS_LIST.append(self)
         self.name: str = name
         self.result: bool = False
-        self.output_to_ports: set[Port] = set()
+        self.child_ports_list: set[Port] = set()
         
-    def execute(self):
-        print("Executing port: ", self.name, " |result: ", self.result)
-        for child_port in self.output_to_ports:
-            ports_to_execute.append(child_port) #aggiungi la porta figlia alla lista delle porte da eseguire al livello N+1
-            set_child_ports_pins.append(child_port.set_pin_values) #self.pin_1 = self.pin_1_Port.result
+    def get_child_ports_list(self):
+        return self.child_ports_list
     
+    def compute_result(self):
+        pass
+
     def set_pin_values(self):
         pass
 
     def __str__(self):
-        return f"{self.name} (result: {self.result})"
+        return "Name: "+ self.name + " -> " + str(self.result)
+
     
 
 
@@ -51,12 +49,11 @@ class AND(Port):
         self.pin_2: bool = False
         self.pin_1_Port:Port = pin_1_Port
         self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.output_to_ports.add(self)
-        pin_2_Port.output_to_ports.add(self)
+        pin_1_Port.child_ports_list.add(self)
+        pin_2_Port.child_ports_list.add(self)
         
-    def execute(self):
-        self.result = self.pin_1 and self.pin_2 #Calcola il risultato -> setta pin1 e pin2 delle porte della list output_to_ports
-        super().execute()
+    def compute_result(self):
+        self.result = self.pin_1 and self.pin_2 #Calcola il risultato -> setta pin1 e pin2 delle porte della list child_ports_list
 
     def set_pin_values(self):
         self.pin_1 = self.pin_1_Port.result
@@ -70,12 +67,11 @@ class OR(Port):
         self.pin_2: bool = False
         self.pin_1_Port:Port = pin_1_Port
         self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.output_to_ports.add(self)
-        pin_2_Port.output_to_ports.add(self)
+        pin_1_Port.child_ports_list.add(self)
+        pin_2_Port.child_ports_list.add(self)
         
-    def execute(self):
+    def compute_result(self):
         self.result = self.pin_1 or self.pin_2
-        super().execute()
 
     def set_pin_values(self):
         self.pin_1 = self.pin_1_Port.result
@@ -89,12 +85,11 @@ class NAND(Port):
         self.pin_2: bool = False
         self.pin_1_Port:Port = pin_1_Port
         self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.output_to_ports.add(self)
-        pin_2_Port.output_to_ports.add(self)
+        pin_1_Port.child_ports_list.add(self)
+        pin_2_Port.child_ports_list.add(self)
         
-    def execute(self):
+    def compute_result(self):
         self.result = not (self.pin_1 and self.pin_2)
-        super().execute()
 
     def set_pin_values(self):
         self.pin_1 = self.pin_1_Port.result
@@ -108,65 +103,69 @@ class NOR(Port):
         self.pin_2: bool = False
         self.pin_1_Port:Port = pin_1_Port
         self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.output_to_ports.add(self)
-        pin_2_Port.output_to_ports.add(self)
+        pin_1_Port.child_ports_list.add(self)
+        pin_2_Port.child_ports_list.add(self)
         
-    def execute(self):
+    def compute_result(self):
         self.result = not (self.pin_1 or self.pin_2)
-        super().execute()
 
     def set_pin_values(self):
         self.pin_1 = self.pin_1_Port.result
         self.pin_2 = self.pin_2_Port.result
 
 class NOT(Port):
-    def __init__(self, pin_1_Port:Port, name: str = "NOT"):
+    def __init__(self, pin_Port:Port, name: str = "NOT"):
         super().__init__()
         self.name = name
         self.pin: bool = False
-        self.pin_1_Port:Port = pin_1_Port
-        pin_1_Port.output_to_ports.add(self)
+        self.pin_Port:Port = pin_Port
+        pin_Port.child_ports_list.add(self)
         
-    def execute(self):
+    def compute_result(self):
         self.result = not self.pin
-        super().execute()
 
     def set_pin_values(self):
-        self.pin = self.pin_1_Port.result
+        self.pin = self.pin_Port.result
 
 #setti la porta in input ad un pin di B, A contiene B nella lista delle porte di output
 
 
 dict_port_to_BFS_level: Dict[Port, int] = {} #porta è il suo livello nella BFS, True e False sono al livello 0
 
-true_obj = PortTrue()
-false_obj = PortFalse()
-ports_to_execute.append(true_obj)
-ports_to_execute.append(false_obj)
+def esegui_rete_logica(max_iterations:int = 10, rete_logica:list[Port] = None):#se non passo la rete logica, eseguo tutte le porte
+    current_level_ports:set[Port] = set()
+    next_level_ports:set[Port] = set()
+    current_level_ports.add(GlOBAL_TRUE)
+    current_level_ports.add(GlOBAL_FALSE)
+    current_level_ports_copy = current_level_ports.copy()
+    level:int = 0
+    iterations:int = 0  
+    print("Level: ", level)
 
-not1 = NOT(true_obj)
-not2 = NOT(false_obj)
+    while len(current_level_ports) >0 and iterations < max_iterations:
+        iterations += 1
+        current_port = current_level_ports.pop()
+        next_level_ports.update(current_port.get_child_ports_list())
+        current_port.compute_result()
+        print(current_port)
 
-print("////////////////////////////////////////////////////////////////////////")
+        if len(current_level_ports) == 0:
+            if(len(next_level_ports) > 0):
+                print("Level: ", level)
+            current_level_ports = next_level_ports.copy()
+            next_level_ports.clear()
+            while len(current_level_ports_copy) > 0:
+                current_port = current_level_ports_copy.pop()
+                current_port.set_pin_values()
 
-number_of_ports_in_a_level:int = len(ports_to_execute)
-level:int = 0
-print("Level: ", level)
 
-while(not len(ports_to_execute) == 0):
-    current_port:Port = ports_to_execute.pop(0)
-    current_port.execute()
-    dict_port_to_BFS_level[current_port] = level
-    number_of_ports_in_a_level -= 1
 
-    if number_of_ports_in_a_level == 0:
-        level += 1
-        print("Level: ", level)
-        for set_pins in set_child_ports_pins:
-            set_pins()
-        number_of_ports_in_a_level = len(ports_to_execute)
 
-print("all ports list", all_ports_list)
+GlOBAL_TRUE = PortTrue()
+GlOBAL_FALSE = PortFalse()
+
+and1 = AND(GlOBAL_TRUE, GlOBAL_FALSE, "AND1")
+esegui_rete_logica()
 
 
 
