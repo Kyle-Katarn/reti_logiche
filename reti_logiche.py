@@ -7,12 +7,23 @@ NON è necessario che tutti i pin dipendano da porte al livello N-1
 GLOBAL_ALL_PORTS_LIST:"Port" = []
 
 class Port:
-    def __init__(self, name: str = "Port"):
+    def __init__(self, input_ports_list:list['Port'], name: str = "Port"):
         GLOBAL_ALL_PORTS_LIST.append(self)
         self.name: str = name
         self.result: bool = False
         self.child_ports_list: set[Port] = set()
-        
+        self.input_ports_list:list[Port] = input_ports_list
+        self.input_values:list[bool] = [False for _ in range(len(input_ports_list))]
+
+        for port in input_ports_list:
+            port.child_ports_list.add(self)
+
+    def add_input_ports(self, input_ports_list:list['Port']):
+        for port in input_ports_list:
+            port.child_ports_list.add(self)
+        self.input_ports_list.extend(input_ports_list)
+        self.input_values.extend([False for _ in range(len(input_ports_list))])
+
     def get_child_ports_list(self):
         return self.child_ports_list
     
@@ -20,7 +31,10 @@ class Port:
         pass
 
     def set_pin_values(self):
-        pass
+        ix:int = 0
+        for port in self.input_ports_list:
+            self.input_values[ix] = port.result
+            ix += 1
 
     def __str__(self):
         return "Name: "+ self.name + " -> " + str(self.result)
@@ -30,107 +44,63 @@ class Port:
 
 class PortTrue(Port):
     def __init__(self, name: str = "TRUE"):
-        super().__init__()
-        self.name = name
+        super().__init__([], name)
         self.result = True
 
 class PortFalse(Port):
     def __init__(self, name: str = "FALSE"):
-        super().__init__()
-        self.name = name
+        super().__init__([], name)
         self.result = False
 
 
 class AND(Port):
-    def __init__(self, pin_1_Port:Port, pin_2_Port:Port, name: str = "AND"): #le porte di input
-        super().__init__()
-        self.name = name
-        self.pin_1: bool = False
-        self.pin_2: bool = False
-        self.pin_1_Port:Port = pin_1_Port
-        self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.child_ports_list.add(self)
-        pin_2_Port.child_ports_list.add(self)
+    def __init__(self, input_ports_list:list[Port], name: str = "AND"):
+        super().__init__(input_ports_list, name)
         
     def compute_result(self):
-        self.result = self.pin_1 and self.pin_2 #Calcola il risultato -> setta pin1 e pin2 delle porte della list child_ports_list
+        self.result = True
+        for value in self.input_values:
+            self.result = self.result and value
 
-    def set_pin_values(self):
-        self.pin_1 = self.pin_1_Port.result
-        self.pin_2 = self.pin_2_Port.result
+
 
 class OR(Port):
-    def __init__(self, pin_1_Port:Port, pin_2_Port:Port, name: str = "OR"):
-        super().__init__()
-        self.name = name
-        self.pin_1: bool = False
-        self.pin_2: bool = False
-        self.pin_1_Port:Port = pin_1_Port
-        self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.child_ports_list.add(self)
-        pin_2_Port.child_ports_list.add(self)
+    def __init__(self, input_ports_list:list[Port], name: str = "OR"):
+        super().__init__(input_ports_list, name)
         
     def compute_result(self):
-        self.result = self.pin_1 or self.pin_2
-
-    def set_pin_values(self):
-        self.pin_1 = self.pin_1_Port.result
-        self.pin_2 = self.pin_2_Port.result
+        self.result = False
+        for value in self.input_values:
+            self.result = self.result or value
 
 class NAND(Port):
-    def __init__(self, pin_1_Port:Port, pin_2_Port:Port, name: str = "NAND"):
-        super().__init__()
-        self.name = name
-        self.pin_1: bool = False
-        self.pin_2: bool = False
-        self.pin_1_Port:Port = pin_1_Port
-        self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.child_ports_list.add(self)
-        pin_2_Port.child_ports_list.add(self)
+    def __init__(self, input_ports_list:list[Port], name: str = "NAND"):
+        super().__init__(input_ports_list, name)
         
     def compute_result(self):
-        self.result = not (self.pin_1 and self.pin_2)
-
-    def set_pin_values(self):
-        self.pin_1 = self.pin_1_Port.result
-        self.pin_2 = self.pin_2_Port.result
+        self.result = True
+        for value in self.input_values:
+            self.result = self.result and value
+        self.result = not self.result
 
 class NOR(Port):
-    def __init__(self, pin_1_Port:Port, pin_2_Port:Port, name: str = "NOR"):
-        super().__init__()
-        self.name = name
-        self.pin_1: bool = False
-        self.pin_2: bool = False
-        self.pin_1_Port:Port = pin_1_Port
-        self.pin_2_Port:Port = pin_2_Port
-        pin_1_Port.child_ports_list.add(self)
-        pin_2_Port.child_ports_list.add(self)
+    def __init__(self, input_ports_list:list[Port], name: str = "NOR"):
+        super().__init__(input_ports_list, name)
         
     def compute_result(self):
-        self.result = not (self.pin_1 or self.pin_2)
-
-    def set_pin_values(self):
-        self.pin_1 = self.pin_1_Port.result
-        self.pin_2 = self.pin_2_Port.result
+        self.result = False
+        for value in self.input_values:
+            self.result = self.result or value
+        self.result = not self.result
 
 class NOT(Port):
-    def __init__(self, pin_Port:Port, name: str = "NOT"):
-        super().__init__()
-        self.name = name
-        self.pin: bool = False
-        self.pin_Port:Port = pin_Port
-        pin_Port.child_ports_list.add(self)
+    def __init__(self, input_port:Port, name: str = "NOT"):
+        super().__init__([input_port], name)
         
     def compute_result(self):
-        self.result = not self.pin
-
-    def set_pin_values(self):
-        self.pin = self.pin_Port.result
+        self.result = not self.input_values[0]
 
 #setti la porta in input ad un pin di B, A contiene B nella lista delle porte di output
-
-
-dict_port_to_BFS_level: Dict[Port, int] = {} #porta è il suo livello nella BFS, True e False sono al livello 0
 
 def esegui_rete_logica(max_iterations:int = 10, rete_logica:list[Port] = None):#se non passo la rete logica, eseguo tutte le porte
     current_level_ports:set[Port] = set()
@@ -150,6 +120,7 @@ def esegui_rete_logica(max_iterations:int = 10, rete_logica:list[Port] = None):#
         print(current_port)
 
         if len(current_level_ports) == 0:
+            level += 1
             if(len(next_level_ports) > 0):
                 print("Level: ", level)
             current_level_ports = next_level_ports.copy()
@@ -164,7 +135,7 @@ def esegui_rete_logica(max_iterations:int = 10, rete_logica:list[Port] = None):#
 GlOBAL_TRUE = PortTrue()
 GlOBAL_FALSE = PortFalse()
 
-and1 = AND(GlOBAL_TRUE, GlOBAL_FALSE, "AND1")
+and1 = AND([GlOBAL_TRUE, GlOBAL_FALSE, GlOBAL_TRUE], "AND1")
 esegui_rete_logica()
 
 

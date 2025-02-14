@@ -9,24 +9,23 @@ pygame.display.set_caption("Logic Gates Visualizer")
 # Colors
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-LIGHTBLUE = (173, 216, 230)
+LIGHTBLUE = "#97dff7"
 WHITE = (255, 255, 255)
+GREEN = "#219e02"
 
 class VisualConnection:
     def __init__(self, start_port: "VisualPort", end_port: "VisualPort", pin_index: int = 1):
         self.start_port:"VisualPort" = start_port
         self.end_port:"VisualPort" = end_port
-        #start_port only output pin
-        self.start_x = start_port.x + start_port.width
-        self.start_y = start_port.y + start_port.height//2
-        
-        self.end_x = end_port.x
-        if isinstance(end_port.port, (AND, OR, NAND, NOR)):
-            self.end_y = end_port.y + end_port.height//3 if pin_index == 1 else end_port.y + 2*end_port.height//3
-        else:
-            self.end_y = end_port.y + end_port.height//2
+        self.pin_index = pin_index
     
     def draw(self, screen):
+        self.start_x = self.start_port.x + self.start_port.width
+        self.start_y = self.start_port.y + self.start_port.height//2
+        
+        self.end_x = self.end_port.x
+        space_in_between_height = self.end_port.height // (len(self.end_port.get_logic_port().input_values)+1)
+        self.end_y = self.end_port.y + space_in_between_height * self.pin_index
         color = BLACK
         if(self.start_port.get_result()):
             color = RED
@@ -41,19 +40,25 @@ class VisualPort:
         self.x = x
         self.y = y
         self.width = 100
-        self.height = 60
+        self.height = max(60, len(self.port.input_values) * 30)  # Adjust height based on number of inputs
         self.pin_radius = 5
+        self.dragging = False
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
     
     def get_result(self):
         return self.port.result
+    
+    def get_logic_port(self):
+        return self.port
 
     def draw(self, screen):
         # Draw port body
-        pygame.draw.rect(screen, LIGHTBLUE, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, self.width, self.height))
         
         # Draw port name
         font = pygame.font.Font(None, 24)
-        text = font.render(self.port.__class__.__name__, True, BLACK)
+        text = font.render(self.port.name, True, BLACK)
         text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
         screen.blit(text, text_rect)
 
@@ -64,24 +69,15 @@ class VisualPort:
                          self.pin_radius)
 
         # Draw input pins
-        if isinstance(self.port, (AND, OR, NAND, NOR)):
-            pin1_color = RED if self.port.pin_1 else BLACK
-            pin2_color = RED if self.port.pin_2 else BLACK
-            
-            # Input pin 1
-            pygame.draw.circle(screen, pin1_color, 
-                             (self.x, self.y + self.height//3), 
-                             self.pin_radius)
-            # Input pin 2
-            pygame.draw.circle(screen, pin2_color, 
-                             (self.x, self.y + 2*self.height//3), 
-                             self.pin_radius)
-        
-        elif isinstance(self.port, NOT):
-            pin_color = RED if self.port.pin else BLACK
-            pygame.draw.circle(screen, pin_color, 
-                             (self.x, self.y + self.height//2), 
-                             self.pin_radius)
+        num_inputs = len(self.port.input_values)
+        if num_inputs > 0:
+            spacing = self.height // (num_inputs + 1)
+            for i, value in enumerate(self.port.input_values):
+                pin_color = RED if value else BLACK
+                y_pos = self.y + spacing * (i + 1)
+                pygame.draw.circle(screen, pin_color, 
+                                 (self.x, y_pos), 
+                                 self.pin_radius)
             
         # Draw connections
         for connection in self.visual_connections:
@@ -92,9 +88,29 @@ class VisualPort:
         connection = VisualConnection(self, end_port, pin_index)
         self.visual_connections.append(connection)
 
+    def contains_point(self, x: int, y: int) -> bool:
+        """Check if point (x,y) is inside the port rectangle"""
+        return (self.x <= x <= self.x + self.width and 
+                self.y <= y <= self.y + self.height)
+
+    def start_drag(self, mouse_x: int, mouse_y: int):
+        """Start dragging, calculate offset from port top-left corner"""
+        self.dragging = True
+        self.drag_offset_x = mouse_x - self.x
+        self.drag_offset_y = mouse_y - self.y
+
+    def end_drag(self):
+        """Stop dragging"""
+        self.dragging = False
+
+    def update_position(self, mouse_x: int, mouse_y: int):
+        """Update position while dragging"""
+        if self.dragging:
+            self.x = mouse_x - self.drag_offset_x
+            self.y = mouse_y - self.drag_offset_y
 
 
-
+#*ordinmento topologico
 def ordinamento_topologico_helper(port: Port, stack: list[Port], visited: set[Port]):
     visited.add(port)
     for child_port in port.child_ports_list:
@@ -111,7 +127,7 @@ def ordinamento_topologico(lista_porte: list[Port]):
             ordinamento_topologico_helper(port, stack, visited)
     return stack
 
-
+#*PORT TO BFS LEVEL
 def get_ports_level_BFS():
     dict_port_to_BFS_level: Dict[Port, int] = {}
     current_level_ports = set()
@@ -140,38 +156,31 @@ def get_ports_level_BFS():
 
 
 def create_visual_ports(lista_porte: list[Port], dict_port_to_BFS_level: dict[Port, int]):
-    lista_porte_ordinata:list[Port] = ordinamento_topologico(lista_porte)
+    lista_porte_ordinata = ordinamento_topologico(lista_porte)
     lista_porte_ordinata.reverse()
-    #print("lista_porte_ordinata: ", lista_porte_ordinata)
     visual_ports = []
     x, y = -100, 50
-    
-    dict_logic_to_visual_ports:dict[Port, VisualPort] = {}
+    dict_y_per_level = {}
+    dict_logic_to_visual_ports = {}
 
-    previus_port_level:int = -1
     for child_port in lista_porte_ordinata:
-        if dict_port_to_BFS_level[child_port] == previus_port_level:
-            print(child_port, previus_port_level)
-            y += 100
+        level = dict_port_to_BFS_level[child_port]
+        if level in dict_y_per_level:
+            y = dict_y_per_level[level] + 100
         else:
             y = 50
             x += 150
-            previus_port_level = dict_port_to_BFS_level[child_port]
-            
-        #print("child_port: ", child_port, " level: ", dict_port_to_BFS_level[child_port])
+        
+        dict_y_per_level[level] = y
         visual_child_Port = VisualPort(child_port, x, y)
         dict_logic_to_visual_ports[child_port] = visual_child_Port
         visual_ports.append(visual_child_Port)
 
+        # Create connections for all input ports
         if not isinstance(child_port, (PortTrue, PortFalse)):
-            pin_1_Port = child_port.pin_1_Port
-            visual_pin_1_Port = dict_logic_to_visual_ports.get(pin_1_Port)
-            visual_pin_1_Port.add_connection(visual_child_Port, 1)
-
-            if isinstance(child_port, (AND, OR, NAND, NOR)):
-                pin_2_Port = child_port.pin_2_Port
-                visual_pin_2_Port = dict_logic_to_visual_ports.get(pin_2_Port)
-                visual_pin_2_Port.add_connection(visual_child_Port, 2)
+            for i, input_port in enumerate(child_port.input_ports_list):
+                visual_input_port:VisualPort = dict_logic_to_visual_ports[input_port]
+                visual_input_port.add_connection(visual_child_Port, i + 1)
 
     return visual_ports
         
@@ -184,12 +193,36 @@ visual_ports:list[VisualPort] = create_visual_ports(lista_ordinata, dict_port_to
 
 # Main game loop
 running = True
+selected_port = None
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        
+        # Handle mouse button down
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            # Check if clicked on any port
+            for port in visual_ports:
+                if port.contains_point(mouse_x, mouse_y):
+                    port.start_drag(mouse_x, mouse_y)
+                    selected_port = port
+                    break
+        
+        # Handle mouse button up
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if selected_port:
+                selected_port.end_drag()
+                selected_port = None
+        
+        # Handle mouse motion
+        elif event.type == pygame.MOUSEMOTION:
+            if selected_port:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                selected_port.update_position(mouse_x, mouse_y)
     
-    screen.fill(WHITE)
+    screen.fill(LIGHTBLUE)
     
     # Draw all ports
     for visual_port in visual_ports:
