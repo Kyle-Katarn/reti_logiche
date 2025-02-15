@@ -34,7 +34,7 @@ class VisualConnection:
 
 
 class VisualPort:
-    def __init__(self, port: Port, x: int, y: int):
+    def __init__(self, port: BasicPort, x: int, y: int):
         self.visual_connections:list[VisualConnection] = []
         self.port = port
         self.x = x
@@ -82,7 +82,6 @@ class VisualPort:
         # Draw connections
         for connection in self.visual_connections:
             connection.draw(screen)
-            
         
     def add_connection(self, end_port: "VisualPort", pin_index: int = 1):
         connection = VisualConnection(self, end_port, pin_index)
@@ -111,29 +110,41 @@ class VisualPort:
 
 
 #*ordinmento topologico
-def ordinamento_topologico_helper(port: Port, stack: list[Port], visited: set[Port]):
+def ordinamento_topologico_helper(port: BasicPort, stack: list[BasicPort], visited: set[BasicPort]):
     visited.add(port)
     for child_port in port.child_ports_list:
         if child_port not in visited:
             ordinamento_topologico_helper(child_port, stack, visited)
     stack.append(port)
 
-def ordinamento_topologico(lista_porte: list[Port]):
-    stack:list[Port] = []
-    visited:set[Port] = set()
+def ordinamento_topologico(lista_porte: list[BasicPort]):
+    stack:list[BasicPort] = []
+    visited:set[BasicPort] = set()
 
     for port in lista_porte:
         if port not in visited:
             ordinamento_topologico_helper(port, stack, visited)
     return stack
 
+
 #*PORT TO BFS LEVEL
-def get_ports_level_BFS():
-    dict_port_to_BFS_level: Dict[Port, int] = {}
+def get_ports_level_BFS(lista_porte: list[BasicPort]):
+    dict_port_to_BFS_level: Dict[BasicPort, int] = {}
+    start_ports = [GlOBAL_TRUE, GlOBAL_FALSE]
+    get_ports_level_BFS_helper(lista_porte, start_ports, dict_port_to_BFS_level)
+
+    unconnected_ports:list[BasicPort] = []
+    for port in lista_porte:
+        if port not in dict_port_to_BFS_level:
+            unconnected_ports.append(port)
+    get_ports_level_BFS_helper(lista_porte, unconnected_ports, dict_port_to_BFS_level)
+    return dict_port_to_BFS_level
+
+
+def get_ports_level_BFS_helper(lista_porte: list[BasicPort], start_ports: list[BasicPort], dict_port_to_BFS_level: dict[BasicPort, int]):
     current_level_ports = set()
     next_level_ports = set()
-    current_level_ports.add(GlOBAL_TRUE)
-    current_level_ports.add(GlOBAL_FALSE)
+    current_level_ports.update(start_ports)
     level = 0
     
     # Initialize first level
@@ -141,8 +152,11 @@ def get_ports_level_BFS():
         dict_port_to_BFS_level[port] = level
 
     while len(current_level_ports) > 0:
-        current_port = current_level_ports.pop()
-        next_level_ports.update(current_port.get_child_ports_list())
+        current_port:"BasicPort" = current_level_ports.pop()
+        current_port_adjacent_ports = current_port.get_child_ports_list()
+        for port in current_port_adjacent_ports:
+            if port in lista_porte:
+                next_level_ports.add(port)
 
         if len(current_level_ports) == 0:
             level += 1
@@ -152,10 +166,10 @@ def get_ports_level_BFS():
             current_level_ports = next_level_ports.copy()
             next_level_ports.clear()
     
-    return dict_port_to_BFS_level
 
 
-def create_visual_ports(lista_porte: list[Port], dict_port_to_BFS_level: dict[Port, int]):
+
+def create_visual_ports(lista_porte: list[BasicPort], dict_port_to_BFS_level: dict[BasicPort, int]):
     lista_porte_ordinata = ordinamento_topologico(lista_porte)
     lista_porte_ordinata.reverse()
     visual_ports = []
@@ -164,6 +178,7 @@ def create_visual_ports(lista_porte: list[Port], dict_port_to_BFS_level: dict[Po
     dict_logic_to_visual_ports = {}
 
     for child_port in lista_porte_ordinata:
+        #print(child_port)
         level = dict_port_to_BFS_level[child_port]
         if level in dict_y_per_level:
             y = dict_y_per_level[level] + 100
@@ -187,8 +202,8 @@ def create_visual_ports(lista_porte: list[Port], dict_port_to_BFS_level: dict[Po
 
 
 
-dict_port_to_BFS_level:dict[Port, int] = get_ports_level_BFS()
-lista_ordinata:list[Port] = ordinamento_topologico(GLOBAL_ALL_PORTS_LIST)
+dict_port_to_BFS_level:dict[BasicPort, int] = get_ports_level_BFS(GLOBAL_ALL_PORTS_LIST)
+lista_ordinata:list[BasicPort] = ordinamento_topologico(GLOBAL_ALL_PORTS_LIST)
 visual_ports:list[VisualPort] = create_visual_ports(lista_ordinata, dict_port_to_BFS_level)
 
 # Main game loop
@@ -203,7 +218,6 @@ while running:
         # Handle mouse button down
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            # Check if clicked on any port
             for port in visual_ports:
                 if port.contains_point(mouse_x, mouse_y):
                     port.start_drag(mouse_x, mouse_y)
