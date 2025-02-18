@@ -24,7 +24,7 @@ class VisualConnection:
         self.start_y = self.start_port.y + self.start_port.height//2
         
         self.end_x = self.end_port.x
-        space_in_between_height = self.end_port.height // (len(self.end_port.get_logic_port().input_values)+1)
+        space_in_between_height = self.end_port.height // (self.end_port.port.get_number_of_inputs()+1)
         self.end_y = self.end_port.y + space_in_between_height * self.pin_index
         color = BLACK
         if(self.start_port.get_result()):
@@ -40,7 +40,7 @@ class VisualPort:
         self.x = x
         self.y = y
         self.width = 100
-        self.height = max(60, len(self.port.input_values) * 30)  # Adjust height based on number of inputs
+        self.height = max(60, self.port.get_number_of_inputs() * 30)  # Changed to use number_of_inputs
         self.pin_radius = 5
         self.dragging = False
         self.drag_offset_x = 0
@@ -69,11 +69,11 @@ class VisualPort:
                          self.pin_radius)
 
         # Draw input pins
-        num_inputs = len(self.port.input_values)
+        num_inputs = self.port.get_number_of_inputs()  # Changed to use number_of_inputs
         if num_inputs > 0:
             spacing = self.height // (num_inputs + 1)
-            for i, value in enumerate(self.port.input_values):
-                pin_color = RED if value else BLACK
+            for i in range(num_inputs):  # Changed to use range(num_inputs)
+                pin_color = RED if self.port.input_signals_list[i] else BLACK
                 y_pos = self.y + spacing * (i + 1)
                 pygame.draw.circle(screen, pin_color, 
                                  (self.x, y_pos), 
