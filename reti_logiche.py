@@ -4,8 +4,8 @@ Una porta sia aggiunge al livello N se uno dei suoi pin dipende da una porta al 
 NON è necessario che tutti i pin dipendano da porte al livello N-1
 '''
 
-GLOBAL_ALL_PORTS_LIST:list['AbstractPort'] = []
-GLOBAL_ALL_SWITCHES_LIST:list['AbstractPort'] = []
+GLOBAL_ALL_GATES_LIST:list['AbstractGate'] = []
+GLOBAL_ALL_SWITCHES_LIST:list['AbstractGate'] = []
 
 class LogicClass:
     '''
@@ -26,41 +26,41 @@ class LogicClass:
 
 
 
-class SwitchPort(LogicClass):
-    def __init__(self, inital_value:bool =True, name: str = "SwitchPort"):
+class SwitchGate(LogicClass):
+    def __init__(self, inital_value:bool =True, name: str = "SwitchGate"):
         super().__init__(name)
         self.number_of_outputs = 1
         self.output_signal: bool = False
         GLOBAL_ALL_SWITCHES_LIST.append(self)
         self.output_signal = inital_value
-        self.child_ports_set: set['AbstractPort'] = set()
+        self.child_gates_set: set['AbstractGate'] = set()
     
     def toggle(self):
         self.output_signal = not self.output_signal
         self.has_oputput_signal_changed = True
     
-    def add_child_port(self, child_port:'AbstractPort'):
-        self.child_ports_set.add(child_port)
+    def add_child_gate(self, child_gate:'AbstractGate'):
+        self.child_gates_set.add(child_gate)
     
-    def get_child_ports_list(self):
-        return self.child_ports_set
+    def get_child_gates(self):
+        return self.child_gates_set
 
-    def print_child_ports_list(self):
-        print("Child ports of(", self, "): ")
-        for c in self.child_ports_set:
+    def print_child_gates(self):
+        print("Child gates of(", self, "): ")
+        for c in self.child_gates_set:
             print(c)
         print("")
 
 
-class AbstractPort(LogicClass):
-    def __init__(self, name: str = "AbstractPort"):
+class AbstractGate(LogicClass):
+    def __init__(self, name: str = "AbstractGate"):
         super().__init__(name)
-        self.input_ports_dict = {}
+        self.input_gates_dict = {}
 
-    def connect_multiple_input_signals_to_input_ports(self, input_ports_param: list["AbstractPort"]):
+    def connect_multiple_input_signals_to_input_gates(self, input_gates_param: list["AbstractGate"]):
         pass
 
-    def connect_input_signal_to_input_port(self, input_port: "AbstractPort", input_signal_ix: int):
+    def connect_input_signal_to_input_gate(self, input_gate: "AbstractGate", input_signal_ix: int):
         pass
 
     def print_input_signal_status(self):
@@ -75,98 +75,112 @@ class AbstractPort(LogicClass):
     def is_input_signal_piloted(self, ix:int):
         pass
 
+    def reset_all_signals(self):
+        pass
+
 
     
-class ModulePort(AbstractPort):
-    def __init__(self, internal_ports:list[AbstractPort] = [], last_layer_ports:list[AbstractPort] = [], name = "AbstractPort"):
+class ModuleGate(AbstractGate):
+    def __init__(self, internal_gates:list[AbstractGate] = [], last_layer_gates:list[AbstractGate] = [], name = "AbstractGate"):
         super().__init__(name)
-        self.input_ports_dict:dict[int, (AbstractPort, int)] = {}
-        self.first_layer_ports:list[AbstractPort] = []#ports with 1 or more unpiloted input signals
-        self.last_layer_ports:list[AbstractPort] = last_layer_ports#ports with no child ports + ports manually added by the user
-        self.internal_ports:list[AbstractPort] = internal_ports
+        self.input_gates_dict:dict[int, (AbstractGate, int)] = {}
+        self.input_gates_names:dict[int, str] = {}
+        self.first_layer_gates:list[AbstractGate] = []#gates with 1 or more unpiloted input signals
+        self.last_layer_gates:list[AbstractGate] = last_layer_gates#gates with no child gates + gates manually added by the user
+        self.internal_gates:list[AbstractGate] = internal_gates
 
 
-        for ip in internal_ports:
+        for ip in internal_gates:
             print(ip.name + "  "+ str(ip.get_number_of_unpiloted_input_signals()))
-            if(ip.get_number_of_unpiloted_input_signals() != 0):#!funziona solo per BasicPort, PROBLEMA
-                self.first_layer_ports.append(ip)
+            if(ip.get_number_of_unpiloted_input_signals() != 0):#!funziona solo per BasicGate, PROBLEMA
+                self.first_layer_gates.append(ip)
 
-        for flp in self.first_layer_ports:
-            #print("flp.number_of_inputs: "+ str(flp.number_of_inputs))
-            for flp_input_port_ix in range(flp.number_of_inputs):  # Fixed iteration
-                #print("FLP: "+ str(flp.name)+ " ix: "+ str(flp_input_port_ix)+ " -is piloted- "+ str(flp.is_input_signal_piloted(flp_input_port_ix)))
-                if(not flp.is_input_signal_piloted(flp_input_port_ix)):
-                    self.input_ports_dict[self.number_of_inputs] = (flp, flp_input_port_ix)
+        for flg in self.first_layer_gates:
+            #print("flg.number_of_inputs: "+ str(flg.number_of_inputs))
+            for flg_input_gate_ix in range(flg.number_of_inputs):  # Fixed iteration
+                #print("FLG: "+ str(flg.name)+ " ix: "+ str(flg_input_gate_ix)+ " -is piloted- "+ str(flg.is_input_signal_piloted(flg_input_gate_ix)))
+                if(not flg.is_input_signal_piloted(flg_input_gate_ix)):
+                    self.input_gates_dict[self.number_of_inputs] = (flg, flg_input_gate_ix)
                     self.number_of_inputs += 1
       
-    def connect_multiple_input_signals_to_input_ports(self, ports_param:list[AbstractPort], first_ix:int =0):
-        if(first_ix+len(ports_param) > self.number_of_inputs):
-            raise IndexError("ERRORE: Input signal index out of range, your last index: " + str(first_ix+len(ports_param)) + " last index: " + (str(self.number_of_inputs)-1))
-        for ip in ports_param:
-            self.connect_input_signal_to_input_port(ip, first_ix)
+    def connect_multiple_input_signals_to_input_gates(self, gates_param:list[AbstractGate], first_ix:int =0):
+        if(first_ix+len(gates_param) > self.number_of_inputs):
+            raise IndexError("ERRORE: Input signal index out of range, your last index: " + str(first_ix+len(gates_param)) + " last index: " + (str(self.number_of_inputs)-1))
+        for ip in gates_param:
+            self.connect_input_signal_to_input_gate(ip, first_ix)
             first_ix +=1
     
-    def connect_input_signal_to_input_port(self, port_param:AbstractPort, ix:int =0):
-        tup = self.input_ports_dict.get(ix)
-        flp, internal_ix = tup
-        flp.connect_input_signal_to_input_port(port_param, internal_ix)
+    def connect_input_signal_to_input_gate(self, gate_param:AbstractGate, ix:int =0):
+        tup = self.input_gates_dict.get(ix)
+        flg, internal_ix = tup
+        flg.connect_input_signal_to_input_gate(gate_param, internal_ix)
 
     def get_number_of_unpiloted_input_signals(self):
         sum:int =0
-        for flp in self.first_layer_ports:
-            sum+= flp.get_number_of_unpiloted_input_signals()#get_number_of_unpiloted_input_signals ha senso solo su BasicPort
+        for flg in self.first_layer_gates:
+            sum+= flg.get_number_of_unpiloted_input_signals()#get_number_of_unpiloted_input_signals ha senso solo su BasicGate
         return sum
 
     def is_input_signal_piloted(self, ix:int):
         if(ix > self.number_of_inputs):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
-        #is_input_signal_piloted ha senso solo su BasicPort
-        #print("esplodi: "+str(self.input_ports_dict.get(ix)[0]))
-        internal_port, internal_ix = self.input_ports_dict.get(ix)
-        return internal_port.is_input_signal_piloted(internal_ix)
+        #is_input_signal_piloted ha senso solo su BasicGate
+        #print("esplodi: "+str(self.input_gates_dict.get(ix)[0]))
+        internal_gate, internal_ix = self.input_gates_dict.get(ix)
+        return internal_gate.is_input_signal_piloted(internal_ix)
     
     def out(self, ix):
         if(ix > self.number_of_inputs):
-            raise IndexError("ERRORE: Output port of range, your last index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
-        return self.last_layer_ports[ix]
+            raise IndexError("ERRORE: Output gate of range, your last index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
+        return self.last_layer_gates[ix]
+    
+    def reset_all_signals(self):
+        for g in self.internal_gates:
+            g.reset_all_signals()
+
+    def print_input_signal_status(self):
+        for ix in range(len(self.input_signals_list)):
+            internal_gate, internal_ix = self.input_gates_dict.get(ix)
+            pilot_gate_info:str
+            #!Non capisco più una sega
         
 
 
-class BasicPort(AbstractPort):
-    def __init__(self, input_ports_list:list['AbstractPort'], number_of_inputs:int = 2, name:str = "PortWithInput"):
+class BasicGate(AbstractGate):
+    def __init__(self, input_gates_list:list['AbstractGate'], number_of_inputs:int = 2, name:str = "GateWithInput"):
         super().__init__(name)
-        GLOBAL_ALL_PORTS_LIST.append(self)
-        self.input_ports_dict:dict[int, AbstractPort] = {} #la porta e l'indice del imput_signal che pilota
+        GLOBAL_ALL_GATES_LIST.append(self)
+        self.input_gates_dict:dict[int, AbstractGate] = {} #la gate e l'indice del imput_signal che pilota
         self.input_signals_list:list[bool] = []
 
         self.output_signal: bool = False
         self.has_oputput_signal_changed: bool = False
-        self.child_ports_set: set['AbstractPort'] = set()
+        self.child_gates_set: set['AbstractGate'] = set()
 
         for _ in range(number_of_inputs): #inizializza la lista degli input_signals
             self.input_signals_list.append(False)
         self.number_of_inputs:int = number_of_inputs
 
-        self.connect_multiple_input_signals_to_input_ports(input_ports_list)
+        self.connect_multiple_input_signals_to_input_gates(input_gates_list)
 
-    def connect_multiple_input_signals_to_input_ports(self, input_ports_param:list[AbstractPort], first_ix:int =0):
-        #!se ci sono più porte di input che input_signals, aggiunge input_signals
-        if(first_ix+len(input_ports_param) > self.number_of_inputs):
-            n:int = first_ix+len(input_ports_param) - self.number_of_inputs
-            print("WARNING: added "+ str(n) + " input ports")
+    def connect_multiple_input_signals_to_input_gates(self, input_gates_param:list[AbstractGate], first_ix:int =0):
+        #!se ci sono più gates di input che input_signals, aggiunge input_signals
+        if(first_ix+len(input_gates_param) > self.number_of_inputs):
+            n:int = first_ix+len(input_gates_param) - self.number_of_inputs
+            print("WARNING: added "+ str(n) + " input gates")
             self.number_of_inputs += n
             
-        for input_port in input_ports_param:
-            input_port.add_child_port(self)
-            self.input_ports_dict[first_ix] = input_port
+        for input_gate in input_gates_param:
+            input_gate.add_child_gate(self)
+            self.input_gates_dict[first_ix] = input_gate
             self.input_signals_list.append(False)
             first_ix +=1
 
-    def connect_input_signal_to_input_port(self, input_port: AbstractPort, ix:int):
+    def connect_input_signal_to_input_gate(self, input_gate: AbstractGate, ix:int):
         if ix >= self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
-        self.input_ports_dict[ix] = input_port
-        input_port.add_child_port(self)
+        self.input_gates_dict[ix] = input_gate
+        input_gate.add_child_gate(self)
 
     def get_number_of_unpiloted_input_signals(self):
         '''
@@ -175,24 +189,24 @@ class BasicPort(AbstractPort):
             if(self.is_input_signal_piloted(ix)):
                 res +=1
         '''
-        return self.number_of_inputs - len(self.input_ports_dict)
+        return self.number_of_inputs - len(self.input_gates_dict)
 
     def is_input_signal_piloted(self, ix:int):
         if(ix > self.number_of_inputs):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
-        return self.input_ports_dict.get(ix) != None
+        return self.input_gates_dict.get(ix) != None
 
-    def add_child_port(self, child_port:AbstractPort):
-        self.child_ports_set.add(child_port)
+    def add_child_gate(self, child_gate:AbstractGate):
+        self.child_gates_set.add(child_gate)
 
     def compute_result(self):
         pass
 
-    def input_ports_results_set_input_signals(self):
+    def input_gates_results_set_input_signals(self):
         for ix in range(self.number_of_inputs):
-            pilot_port:AbstractPort = self.input_ports_dict.get(ix)
-            if(pilot_port != None):
-                self.input_signals_list[ix] = pilot_port.output_signal
+            pilot_gate:AbstractGate = self.input_gates_dict.get(ix)
+            if(pilot_gate != None):
+                self.input_signals_list[ix] = pilot_gate.output_signal
 
     def has_output_signal_changed(self):#da chiamare dopo compute_result
         return self.has_oputput_signal_changed
@@ -200,32 +214,38 @@ class BasicPort(AbstractPort):
     def __str__(self):
         return super().__str__() + " -> " + str(self.output_signal)
  
-    def get_input_ports_dict(self):
-        return self.input_ports_dict
+    def get_input_gates_dict(self):
+        return self.input_gates_dict
 
-    def get_child_ports_set(self):
-        return self.child_ports_set
+    def get_child_gates_set(self):
+        return self.child_gates_set
     
     def print_input_signal_status(self):
         for ix in range(len(self.input_signals_list)):
-            pilot_port:AbstractPort = self.input_ports_dict.get(ix)
-            pilot_port_info:str
-            if(pilot_port == None):
-                pilot_port_info = "NONE"
+            pilot_gate:AbstractGate = self.input_gates_dict.get(ix)
+            pilot_gate_info:str
+            if(pilot_gate == None):
+                pilot_gate_info = "NONE"
             else:
-                pilot_port_info = pilot_port.get_name()
-            print("SIGNAL IX: ", ix, " |PILOT PORT: ", pilot_port_info, " |SIGNAL STATUS: ", self.input_signals_list[ix])
+                pilot_gate_info = pilot_gate.get_name()
+            print("SIGNAL IX: ", ix, " |PILOT GATE: ", pilot_gate_info, " |SIGNAL STATUS: ", self.input_signals_list[ix])
 
     def print_output_signal_status(self):
-        print(self + ", Child ports:")
-        for p in self.child_ports_set:
+        print(self + ", Child gates:")
+        for p in self.child_gates_set:
             print(p)
 
+    def reset_all_signals(self):
+        for ix in range(len(self.input_signals_list)):
+            self.input_signals_list[ix] = False
+        self.output_signal = False
+        self.has_oputput_signal_changed = False
 
 
-class AND(BasicPort):
-    def __init__(self, input_ports_list:list[AbstractPort] = [], n_input_signals:int = 2, name: str = "AND"):
-        super().__init__(input_ports_list, n_input_signals, name)
+
+class AND(BasicGate):
+    def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "AND"):
+        super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
         old_output_signal = self.output_signal
@@ -236,9 +256,9 @@ class AND(BasicPort):
         self.has_oputput_signal_changed = old_output_signal != self.output_signal
 
 
-class OR(BasicPort):
-    def __init__(self, input_ports_list:list[AbstractPort] = [], n_input_signals:int = 2, name: str = "OR"):
-        super().__init__(input_ports_list, n_input_signals, name)
+class OR(BasicGate):
+    def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "OR"):
+        super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
         old_output_signal = self.output_signal
@@ -248,9 +268,9 @@ class OR(BasicPort):
         self.has_oputput_signal_changed = old_output_signal != self.output_signal
 
 
-class NAND(BasicPort):
-    def __init__(self, input_ports_list:list[AbstractPort] = [], n_input_signals:int = 2, name: str = "NAND"):
-        super().__init__(input_ports_list, n_input_signals, name)
+class NAND(BasicGate):
+    def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NAND"):
+        super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
         old_output_signal = self.output_signal
@@ -260,9 +280,9 @@ class NAND(BasicPort):
         self.output_signal = not self.output_signal
         self.has_oputput_signal_changed = old_output_signal != self.output_signal
 
-class NOR(BasicPort):
-    def __init__(self, input_ports_list:list[AbstractPort] = [], n_input_signals:int = 2, name: str = "NOR"):
-        super().__init__(input_ports_list, n_input_signals, name)
+class NOR(BasicGate):
+    def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NOR"):
+        super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
         old_output_signal = self.output_signal
@@ -272,17 +292,17 @@ class NOR(BasicPort):
         self.output_signal = not self.output_signal
         self.has_oputput_signal_changed = old_output_signal != self.output_signal
 
-class NOT(BasicPort):
-    def __init__(self, input_port:AbstractPort = None, name: str = "NOT"):
+class NOT(BasicGate):
+    def __init__(self, input_gate:AbstractGate = None, name: str = "NOT"):
         super().__init__([], 1, name)
-        self.add_input_port(input_port)
+        self.add_input_gate(input_gate)
 
-    def add_input_port(self, input_port_param:AbstractPort):
-        if(self.get_input_ports_dict().get(0) == None):
-            self.get_input_ports_dict()[0] = input_port_param
-            input_port_param.add_child_port(self)
+    def add_input_gate(self, input_gate_param:AbstractGate):
+        if(self.get_input_gates_dict().get(0) == None):
+            self.get_input_gates_dict()[0] = input_gate_param
+            input_gate_param.add_child_gate(self)
         else:
-            print("WARNING: La porta NOT accetta SOLO 1 segnale in input - Operazione annullata")
+            print("WARNING: La gate NOT accetta SOLO 1 segnale in input - Operazione annullata")
 
         
     def compute_result(self):
@@ -290,69 +310,71 @@ class NOT(BasicPort):
         self.output_signal = not self.input_signals_list[0]
         self.has_oputput_signal_changed = old_output_signal != self.output_signal
 
-#setti la porta in input ad un pin di B, A contiene B nella lista delle porte di output
+#setti la gate in input ad un pin di B, A contiene B nella lista delle gates di output
 
-def apply_SwitchPorts_immediatly(considered_switches:list[AbstractPort]):
+def apply_SwitchGates_immediatly(considered_switches:list[AbstractGate]):
     for p in considered_switches:
-        for f in p.child_ports_set:
-            f.input_ports_results_set_input_signals()
-                #applica prende i risultati di tutte le porte in input
-                #*NON è un problema se il metodo è chiamato a fine turno ossia dopo aver chiamato set_input_signals su tutte currnet_level_ports. (è un problema altrimenti)
+        for f in p.child_gates_set:
+            f.input_gates_results_set_input_signals()
+                #applica prende i risultati di tutte le gates in input
+                #*NON è un problema se il metodo è chiamato a fine turno ossia dopo aver chiamato set_input_signals su tutte currnet_level_gates. (è un problema altrimenti)
 
 
-#!funziona solo con BASIC PORT
-def esegui_rete_logica(max_iterations:int = 10, considered_ports:list[BasicPort] = GLOBAL_ALL_PORTS_LIST, considered_switches:list[SwitchPort] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le porte
-    apply_SwitchPorts_immediatly(considered_switches)
+#!funziona solo con BASIC GATE
+def esegui_rete_logica(max_iterations:int = 10, considered_gates:list[BasicGate] = GLOBAL_ALL_GATES_LIST, considered_switches:list[SwitchGate] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le gates
+    apply_SwitchGates_immediatly(considered_switches)
 
-    current_level_ports:set[AbstractPort] = set()
-    next_level_ports:set[AbstractPort] = set()
-    current_level_ports.update(considered_ports)
-    print(considered_ports)
+    current_level_gates:set[AbstractGate] = set()
+    next_level_gates:set[AbstractGate] = set()
+    current_level_gates.update(considered_gates)
+    print(considered_gates)
 
-    current_level_ports_copy = current_level_ports.copy()
+    current_level_gates_copy = current_level_gates.copy()
     level:int = 0
     iterations:int = 0  
     print("LEVEL: ", level)
 
-    while len(current_level_ports) >0 and iterations < max_iterations:
+    while len(current_level_gates) >0 and iterations < max_iterations:
         iterations += 1
-        current_port:BasicPort = current_level_ports.pop()
-        current_port.compute_result()
-        if(current_port.has_output_signal_changed):
-            next_level_ports.update(current_port.get_child_ports_set())
-        print(current_port)
+        current_gate:BasicGate = current_level_gates.pop()
+        current_gate.compute_result()
+        if(current_gate.has_output_signal_changed):
+            next_level_gates.update(current_gate.get_child_gates_set())
+        print(current_gate)
 
-        if len(current_level_ports) == 0:
+        if len(current_level_gates) == 0:
             level += 1
-            if(len(next_level_ports) > 0):
+            if(len(next_level_gates) > 0):
                 print("LEVEL: ", level)
-            current_level_ports = next_level_ports.copy()
-            next_level_ports.clear()
-            while len(current_level_ports_copy) > 0:
-                current_port = current_level_ports_copy.pop()
-                current_port.input_ports_results_set_input_signals()  # Updated method call
+            current_level_gates = next_level_gates.copy()
+            next_level_gates.clear()
+            while len(current_level_gates_copy) > 0:
+                current_gate = current_level_gates_copy.pop()
+                current_gate.input_gates_results_set_input_signals()  # Updated method call
 
-switch1 = SwitchPort()
+switch1 = SwitchGate()
 
-and1 = AND([switch1], 2, "and1")
+and1 = AND([switch1, switch1], 2, "and1")
 not1 = NOT(and1)
 or1 = OR([], 2, "OR1")
-#esegui_rete_logica()
+esegui_rete_logica()
 
-'''#*and1 non ha più input port libera
+print("/////////////////////////////////7")
+
+'''#*and1 non ha più input gate libera
 or2 = OR([], 2, "OR1")
-and1.connect_input_signal_to_input_port(or2, 1)
+and1.connect_input_signal_to_input_gate(or2, 1)
 '''
-mod:ModulePort = ModulePort([and1,not1,or1])
-#*and1 non ha più input port libera
+mod:ModuleGate = ModuleGate([and1,not1,or1])
+#*and1 non ha più input gate libera
 or2 = OR([], 2, "OR1")
-mod.connect_input_signal_to_input_port(or2, 0)
+mod.connect_input_signal_to_input_gate(or2, 0)
 
-mod1:ModulePort = ModulePort([mod, or2])
+mod1:ModuleGate = ModuleGate([mod, or2])
 
-print(mod.input_ports_dict)
+print(mod.input_gates_dict)
 print("get_number_of_unpiloted_input_signals: " + str(mod.get_number_of_unpiloted_input_signals()))
 print("number_of_inputs: " + str(mod.number_of_inputs))
-print(mod1.input_ports_dict)
+print(mod1.input_gates_dict)
 print("get_number_of_unpiloted_input_signals: " + str(mod1.get_number_of_unpiloted_input_signals()))
 print("number_of_inputs: " + str(mod1.number_of_inputs))
