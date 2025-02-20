@@ -48,3 +48,35 @@ def add_input_ports(self, input_ports_param:list[AbstractPort]):
         for p in input_ports_param:
             self.input_ports_dict[self.number_of_piloted_input_signals] = p
             self.number_of_piloted_input_signals +=1
+
+
+////////////////////////////////
+
+and1 = AND([switch1, switch1], 2, "and1")
+not1 = NOT(and1)
+or1 = OR([], 2, "OR1")
+#esegui_rete_logica()
+
+print("/////////////////////////////////7")
+
+'''#*and1 non ha più input gate libera
+or2 = OR([], 2, "OR1")
+and1.connect_input_signal_to_input_gate(or2, 1)
+'''
+mod:ModuleGate = ModuleGate([and1,not1,or1])
+#*and1 non ha più input gate libera
+or2 = OR([], 2, "OR1")
+mod.connect_input_signal_to_input_gate(or2, 0)
+
+mod1:ModuleGate = ModuleGate([mod, or2])
+
+print(mod.input_gates_dict)
+print("get_number_of_unpiloted_input_signals: " + str(mod.get_number_of_unpiloted_input_signals()))
+print("number_of_inputs: " + str(mod.number_of_inputs))
+print(mod1.input_gates_dict)
+print("get_number_of_unpiloted_input_signals: " + str(mod1.get_number_of_unpiloted_input_signals()))
+print("number_of_inputs: " + str(mod1.number_of_inputs))
+
+mod1.print_input_signal_status()
+
+print(mod1.get_all_internal_BasicGates())
