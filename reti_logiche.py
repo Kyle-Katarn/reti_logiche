@@ -33,7 +33,7 @@ class SwitchGate(LogicClass):
         self.output_signal: bool = False
         GLOBAL_ALL_SWITCHES_LIST.append(self)
         self.output_signal = inital_value
-        self.child_gates_set: set['AbstractGate'] = set()
+        self.child_gates_set: set[tuple['AbstractGate', int]] = set()
     
     def toggle(self):
         self.output_signal = not self.output_signal
@@ -42,8 +42,8 @@ class SwitchGate(LogicClass):
     def add_child_gate(self, child_gate:'AbstractGate'):
         self.child_gates_set.add(child_gate)
     
-    def get_child_gates(self):
-        return self.child_gates_set
+    def get_output_signal(self, ix=0):
+        return self.output_signal
 
     def print_child_gates(self):
         print("Child gates of(", self, "): ")
@@ -87,7 +87,7 @@ class AbstractGate(LogicClass):
     def get_input_signal_status(self,ix):
         pass
 
-    def get_output_signal_status(self,ix):
+    def get_output_signal_status(self,ix=0):
         pass
 
 
@@ -172,6 +172,14 @@ class ModuleGate(AbstractGate):
         output_gate, output_gate_ix = self.output_gates_dict.get(ix)
         return output_gate.get_output_gate(output_gate_ix)
     
+    def get_all_child_gates(self):
+        tot:set[BasicGate] = set()
+        for ig in self.internal_gates:
+            for cg in ig.get_all_child_gates():
+                if(not cg in self.internal_gates):
+                    tot.add(cg)
+        return tot
+
     def get_output_signal_status(self, ix):
         internal_gate, internal_ix = self.output_gates_dict.get(ix)[0] #sono tutti piloati dalla stesso BasicGate
         return internal_gate.get_output_signal_status(internal_ix)
@@ -238,43 +246,50 @@ class ModuleGate(AbstractGate):
         return ris
         
 
-
+class SIGNAL():
+    def __init__(self, val:bool = False):
+        self.val = val
 
 class BasicGate(AbstractGate):
     def __init__(self, input_gates_list:list['BasicGate'], number_of_inputs:int = 2, name:str = "GateWithInput"):
         super().__init__(name)
         GLOBAL_ALL_GATES_LIST.append(self)
-        self.input_gates_dict:dict[int, 'BasicGate'] = {}  # Changed from AbstractGate to BasicGate
-        self.input_signals_list:list[bool] = []
+        self.input_gates_dict:dict[int, tuple['BasicGate', int]] = {} #input gate e l'ix del segnale di output di input gate
+        self.input_signals_list:list[SIGNAL] = []
 
-        self.output_signal: bool = False
+        self.output_signal: SIGNAL = SIGNAL()  # Initialize as SIGNAL instance
+        self.number_of_outputs:int = 1
         self.has_oputput_signal_changed: bool = False
-        self.child_gates_set: set['BasicGate'] = set()  # Changed from AbstractGate to BasicGate
+        self.child_gates_set: set[tuple['BasicGate',int]] = set() #child gate e l'ix del segnale di input di child gate
 
         for _ in range(number_of_inputs): #inizializza la lista degli input_signals
-            self.input_signals_list.append(False)
+            self.input_signals_list.append(SIGNAL())
         self.number_of_inputs:int = number_of_inputs
 
         self.connect_multiple_input_gates_to_input_signals(input_gates_list)
 
-    def connect_multiple_input_gates_to_input_signals(self, input_gates_param:list["BasicGate"], first_ix:int =0):
+    def connect_multiple_input_gates_to_input_signals(self, param:list[tuple["AbstractGate",int]], first_ix:int =0):
         #!se ci sono più gates di input che input_signals, aggiunge input_signals
-        if(first_ix+len(input_gates_param) > self.number_of_inputs):
-            n:int = first_ix+len(input_gates_param) - self.number_of_inputs
+        n:int =0#numbers of signals to add
+        if(first_ix+len(param) > self.number_of_inputs):
+            n= first_ix+len(param) - self.number_of_inputs
             print("WARNING: added "+ str(n) + " input gates")
             self.number_of_inputs += n
+
+        for j in range(n):#adds more signals if needed
+            self.input_signals_list.append(SIGNAL())
             
-        for input_gate in input_gates_param:
-            input_gate.add_child_gate(self)
-            self.input_gates_dict[first_ix] = input_gate
-            self.input_signals_list.append(False)
+        for input_gate, input_gate_signal_ix in param:
+            input_gate.add_child_gate((self,first_ix)) #child gate = self, ix signal di input di childgate
+            self.input_gates_dict[first_ix] = (input_gate,input_gate_signal_ix)
             first_ix +=1
 
-    def connect_input_gate_to_input_signal(self, input_gate: 'BasicGate', ix:int):
+    def connect_input_gate_to_input_signal(self, param: tuple[AbstractGate, int], ix:int):
         if ix >= self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
-        self.input_gates_dict[ix] = input_gate
-        input_gate.add_child_gate(self)
+        self.input_gates_dict[ix] = param
+        input_gate, input_gate_signal_ix = param
+        input_gate.add_child_gate(tuple[self,ix])
 
     def get_number_of_unpiloted_input_signals(self):
         return self.number_of_inputs - len(self.input_gates_dict)
@@ -285,37 +300,43 @@ class BasicGate(AbstractGate):
         return self.input_gates_dict.get(ix) != None
     
     def get_input_signal_status(self,ix):
-        return self.input_signals_list[ix]
+        return self.input_signals_list[ix].val
     
     def get_output_signal_status(self, ix=0):
-        return self.output_signal
+        return self.output_signal.val
 
     def add_child_gate(self, child_gate:'BasicGate'):
         self.child_gates_set.add(child_gate)
 
+    '''#!FIX?
+    def get_all_child_gates(self):
+        return self.child_gates_set
+    '''
+
     def compute_result(self):
         pass
 
-    def input_gates_results_set_input_signals(self):
-        for ix in range(self.number_of_inputs):
-            pilot_gate:BasicGate = self.input_gates_dict.get(ix)
-            if(pilot_gate != None):
-                self.input_signals_list[ix] = pilot_gate.output_signal
-
     def has_output_signal_changed(self):#da chiamare dopo compute_result
         return self.has_oputput_signal_changed
+    
+    def get_output_signal(self, ix=0):
+        return self.output_signal.val
+
+    def input_gates_results_set_input_signals(self, input_signal_ix): 
+        input_gate, input_gate_output_signal_ix = self.input_gates_dict[input_signal_ix]
+        self.input_signals_list[input_signal_ix].val = input_gate.get_output_signal(input_gate_output_signal_ix)
 
     def __str__(self):
-        return super().__str__() + " -> " + str(self.output_signal)
+        return super().__str__() + " -> " + str(self.output_signal.val)
 
     def reset_all_signals(self):
         for ix in range(len(self.input_signals_list)):
-            self.input_signals_list[ix] = False
-        self.output_signal = False
+            self.input_signals_list[ix] = SIGNAL()
+        self.output_signal = SIGNAL()
         self.has_oputput_signal_changed = False
     
-    def print_input_signal_status(self, input_signal_ix:int, lvl:int): 
-        pilot_gate:BasicGate = self.input_gates_dict.get(input_signal_ix)
+    def print_input_signal_status(self, input_signal_ix:int, lvl:int =0): 
+        pilot_gate, pilot_gate_output_signal_ix = self.input_gates_dict.get(input_signal_ix)
         pilot_gate_info:str = "/"
         if(pilot_gate != None):
             pilot_gate_info = pilot_gate.name
@@ -324,7 +345,7 @@ class BasicGate(AbstractGate):
             before += " >"
         if(lvl == 0):
             before += "O"
-        print(before+ " Signal IX: "+str(input_signal_ix)+" of "+self.name+" |PILOT_GATE: " +str(pilot_gate_info)  +" |----------------| STATUS: "+ str(self.input_signals_list[input_signal_ix]))
+        print(before+ " Signal IX: "+str(input_signal_ix)+" of "+self.name+" |PILOT_GATE: " +str(pilot_gate_info) + "PILOT_GATE_OUTPUT_SIGNAL_IX: "+ str(pilot_gate_output_signal_ix) +" |----------------| STATUS: "+ str(self.input_signals_list[input_signal_ix]))
 
     def print_all_input_signals_status(self): 
         print("@ Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
@@ -340,9 +361,9 @@ class BasicGate(AbstractGate):
             before += "O"
         print(before+ " Signal IX: "+str(output_signal_ix)+" of "+self.name + " |----------------| STATUS: "+ str(self.input_signals_list[output_signal_ix]))
         if(len(self.child_gates_set) >0):
-            print("CHILD GATES: ")
-            for g in self.child_gates_set:
-                print(" -> "+ str(g))
+            print("PILOTS CHILD GATES: ")
+            for cg, cg_is_ix in self.child_gates_set:
+                print(" -> ("+ str(cg) +") on INPUT_SIGNAL_IX: "+ str(cg_is_ix))
 
     def print_all_output_signals_status(self): 
         print("@ OUTPUT SIGNALS - Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
@@ -353,10 +374,7 @@ class BasicGate(AbstractGate):
     def get_all_internal_BasicGates(self):
         return [self]
     
-    def get_output_gate(self, ix=0):
-        return self
-    
-    def get_number_of_children(self):
+    def get_number_of_piloted_signals(self): #!NOT get_number_of_children
         return len(self.child_gates_set)
 
 
@@ -366,12 +384,11 @@ class AND(BasicGate):
         super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
-        old_output_signal = self.output_signal
-        print("old_output_signal: "+ str(old_output_signal))
-        self.output_signal = True
-        for value in self.input_signals_list:
-            self.output_signal = self.output_signal and value
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        self.output_signal.val = True
+        for s in self.input_signals_list:
+            self.output_signal.val = self.output_signal.val and s.val
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 
 class OR(BasicGate):
@@ -379,11 +396,11 @@ class OR(BasicGate):
         super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
-        old_output_signal = self.output_signal
-        self.output_signal = False
-        for value in self.input_signals_list:
-            self.output_signal = self.output_signal or value
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        self.output_signal.val = False
+        for s in self.input_signals_list:
+            self.output_signal.val = self.output_signal.val or s.val
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 
 class NAND(BasicGate):
@@ -391,63 +408,59 @@ class NAND(BasicGate):
         super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
-        old_output_signal = self.output_signal
-        self.output_signal = True
-        for value in self.input_signals_list:
-            self.output_signal = self.output_signal and value
-        self.output_signal = not self.output_signal
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        self.output_signal.val = True
+        for s in self.input_signals_list:
+            self.output_signal.val = self.output_signal.val and s.val
+        self.output_signal.val = not self.output_signal.val
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 class NOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NOR"):
         super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
-        old_output_signal = self.output_signal
-        self.output_signal = False
-        for value in self.input_signals_list:
-            self.output_signal = self.output_signal or value
-        self.output_signal = not self.output_signal
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        self.output_signal.val = False
+        for s in self.input_signals_list:
+            self.output_signal.val = self.output_signal.val or s.val
+        self.output_signal.val = not self.output_signal.val
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 class NOT(BasicGate):
-    def __init__(self, input_gate:AbstractGate = None, name: str = "NOT"):
+    def __init__(self, input_gate:tuple[AbstractGate, int] = (None, 0), name: str = "NOT"):
         super().__init__([], 1, name)
         self.add_input_gate(input_gate)
 
-    def add_input_gate(self, input_gate_param:AbstractGate):
+    def add_input_gate(self, input_gate:tuple[AbstractGate, int]):
         if(self.input_gates_dict.get(0) == None):
-            self.input_gates_dict[0] = input_gate_param
-            input_gate_param.add_child_gate(self)
+            self.input_gates_dict[0] = input_gate  #(input_gate, input_gate_output_signal_ix)
+            input_gate[0].add_child_gate((self, 0))  # (self, self_input_signal_ix)
         else:
             print("WARNING: La gate NOT accetta SOLO 1 segnale in input - Operazione annullata")
 
-        
     def compute_result(self):
-        old_output_signal = self.output_signal
-        self.output_signal = not self.input_signals_list[0]
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        self.output_signal.val = not self.input_signals_list[0].val
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 class XOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "XOR"):
         super().__init__(input_gates_list, n_input_signals, name)
         
     def compute_result(self):
-        old_output_signal = self.output_signal
-        self.output_signal = False
-        number_of_true_inputs = sum(1 for value in self.input_signals_list if value)
-        self.output_signal = (number_of_true_inputs % 2) == 1  # XOR is true when odd number of inputs are true
-        self.has_oputput_signal_changed = old_output_signal != self.output_signal
+        old_output_signal_val = self.output_signal.val
+        number_of_true_inputs = sum(1 for signal in self.input_signals_list if signal.val)
+        self.output_signal.val = (number_of_true_inputs % 2) == 1  # XOR is true when odd number of inputs are true
+        self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
 
 #setti la gate in input ad un pin di B, A contiene B nella lista delle gates di output
 
 def apply_SwitchGates_immediatly(considered_switches:list[AbstractGate]):
     for p in considered_switches:
-        for f in p.child_gates_set:
-            f.input_gates_results_set_input_signals()
-                #applica prende i risultati di tutte le gates in input
-                #*NON è un problema se il metodo è chiamato a fine turno ossia dopo aver chiamato set_input_signals su tutte currnet_level_gates. (è un problema altrimenti)
-
+        for child_gate, child_gate_input_signal_ix in p.child_gates_set:
+            child_gate.input_gates_results_set_input_signals(child_gate_input_signal_ix)
+                
 
 #!funziona solo con BASIC GATE
 def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = GLOBAL_ALL_GATES_LIST, considered_switches:list[SwitchGate] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le gates
@@ -456,59 +469,44 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
     current_level_gates:set[AbstractGate] = set()
     next_level_gates:set[AbstractGate] = set()
     current_level_gates.update(considered_gates)
-    #print(considered_gates)
-
-    current_level_gates_copy = current_level_gates.copy()
-    #^^^Copy needed because first he computes results for all current level gates 
-    #then it sets the input signals to the children of current level gates
+    #current_level_gates_copy = current_level_gates.copy()#!ERRATO lista di funzioni per i pin che devono essere cambiati a fine turno
+    next_level_gates_signals_to_update:set[AbstractGate, int] = set()#next_level_gate, signal_ix to update
     level:int = 0
     iterations:int = 0  
     print("LEVEL: ", level)
 
     while len(current_level_gates) >0 and iterations < max_iterations:
         iterations += 1
-        current_gate:BasicGate = current_level_gates.pop()
+        current_gate:AbstractGate = current_level_gates.pop()
         current_gate.compute_result()
         if(current_gate.has_output_signal_changed):
-            next_level_gates.update(current_gate.child_gates_set)
+            for tup in current_gate.child_gates_set:
+                next_level_gates_signals_to_update.add(tup) #(child_gate, child_gate_input_signal_ix)
+                next_level_gates.add(tup[0])
+            #! add (A,0) set input signal di A,0
         print(current_gate)
 
         if len(current_level_gates) == 0:
             level += 1
             if(len(next_level_gates) > 0):
                 print("LEVEL: ", level)
+            while len(next_level_gates_signals_to_update) > 0:
+                tup = next_level_gates_signals_to_update.pop()
+                child_gate, child_gate_input_signal_ix = tup
+                child_gate.input_gates_results_set_input_signals(child_gate_input_signal_ix)
             current_level_gates = next_level_gates.copy()
             next_level_gates.clear()
-            while len(current_level_gates_copy) > 0:
-                current_gate = current_level_gates_copy.pop()
-                current_gate.input_gates_results_set_input_signals()
+
+
+#? SITAX: list[(Gate0, Gate0_output_signal_ix), (Gate1, Gate1_output_signal_ix)]; Gate0 input_gates_dict[ix=0], Gate1 input_gates_dict[ix=1];
 
 switch1 = SwitchGate()
 switch2 = SwitchGate()
+and1 = AND([(switch1,0), (switch2,0)], name="and1")
+and2 = AND([(and1,0), (switch1,0)], name="and2")
+not1 = NOT((and2,0))
+run_simulation()
 
-and1:AND = AND()
-xor1:XOR = XOR()
-print("and1.number_of_inputs: " + str(and1.number_of_inputs))
-half_adder:ModuleGate = ModuleGate([xor1, and1], name="halfadder", number_of_inputs=2, number_of_outputs=2)
-half_adder.set_input_signal_to_flg_input_signal(0, and1, 0)
-half_adder.set_input_signal_to_flg_input_signal(0, xor1, 0)
-half_adder.set_input_signal_to_flg_input_signal(1, and1, 1)
-half_adder.set_input_signal_to_flg_input_signal(1, xor1, 1)
-
-half_adder.set_output_signal_to_llg_output_signal(0, and1, 0)
-half_adder.set_output_signal_to_llg_output_signal(1, xor1, 0)
-
-half_adder.connect_multiple_input_gates_to_input_signals([switch1, switch2])
-half_adder.print_all_input_signals_status()
-half_adder.print_all_output_signals_status()
-
-or1 = OR(input_gates_list=[half_adder.get_output_gate(0), half_adder.get_output_gate(1)])
-sim_gates= []
-sim_gates.extend(half_adder.get_all_internal_BasicGates())
-sim_gates.extend(or1.get_all_internal_BasicGates())
-print(sim_gates)
-
-run_simulation(considered_gates=sim_gates)
 
 
 

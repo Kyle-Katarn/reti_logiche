@@ -80,3 +80,67 @@ print("number_of_inputs: " + str(mod1.number_of_inputs))
 mod1.print_input_signal_status()
 
 print(mod1.get_all_internal_BasicGates())
+
+#!////////////////////////////////////
+
+#!funziona solo con BASIC GATE
+def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = GLOBAL_ALL_GATES_LIST, considered_switches:list[SwitchGate] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le gates
+    apply_SwitchGates_immediatly(considered_switches)
+
+    current_level_gates:set[AbstractGate] = set()
+    next_level_gates:set[AbstractGate] = set()
+    current_level_gates.update(considered_gates)
+    #print(considered_gates)
+
+    current_level_gates_copy = current_level_gates.copy()#!ERRATO lista di funzioni per i pin che devono essere cambiati a fine turno
+    #^^^Copy needed because first he computes results for all current level gates 
+    #then it sets the input signals to the children of current level gates
+    level:int = 0
+    iterations:int = 0  
+    print("LEVEL: ", level)
+
+    while len(current_level_gates) >0 and iterations < max_iterations:
+        iterations += 1
+        current_gate:BasicGate = current_level_gates.pop()
+        current_gate.compute_result()
+        if(current_gate.has_output_signal_changed):
+            next_level_gates.update(current_gate.child_gates_set)
+            #! add (A,0) set input signal di A,0
+        print(current_gate)
+
+        if len(current_level_gates) == 0:
+            level += 1
+            if(len(next_level_gates) > 0):
+                print("LEVEL: ", level)
+            current_level_gates = next_level_gates.copy()
+            next_level_gates.clear()
+            while len(current_level_gates_copy) > 0:
+                current_gate = current_level_gates_copy.pop()
+                current_gate.input_gates_results_set_input_signals()
+
+switch1 = SwitchGate()
+switch2 = SwitchGate()
+
+and1:AND = AND()
+xor1:XOR = XOR()
+print("and1.number_of_inputs: " + str(and1.number_of_inputs))
+half_adder:ModuleGate = ModuleGate([xor1, and1], name="halfadder", number_of_inputs=2, number_of_outputs=2)
+half_adder.set_input_signal_to_flg_input_signal(0, and1, 0)
+half_adder.set_input_signal_to_flg_input_signal(0, xor1, 0)
+half_adder.set_input_signal_to_flg_input_signal(1, and1, 1)
+half_adder.set_input_signal_to_flg_input_signal(1, xor1, 1)
+
+half_adder.set_output_signal_to_llg_output_signal(0, and1, 0)
+half_adder.set_output_signal_to_llg_output_signal(1, xor1, 0)
+
+half_adder.connect_multiple_input_gates_to_input_signals([switch1, switch2])
+half_adder.print_all_input_signals_status()
+half_adder.print_all_output_signals_status()
+
+or1 = OR(input_gates_list=[half_adder.get_output_gate(0), half_adder.get_output_gate(1)])
+sim_gates= []
+sim_gates.extend(half_adder.get_all_internal_BasicGates())
+sim_gates.extend(or1.get_all_internal_BasicGates())
+print(sim_gates)
+
+run_simulation(considered_gates=sim_gates)
