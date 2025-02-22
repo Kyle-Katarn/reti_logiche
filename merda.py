@@ -144,3 +144,98 @@ sim_gates.extend(or1.get_all_internal_BasicGates())
 print(sim_gates)
 
 run_simulation(considered_gates=sim_gates)
+
+#//////////
+
+def set_input_signals_automatically(self):
+        first_layer_gates:list[AbstractGate] = []#gates with 1 or more unpiloted input signals #!spostalo
+        for ip in self.internal_gates:
+            print(ip.name + "  "+ str(ip.get_number_of_unpiloted_input_signals()))
+            if(ip.get_number_of_unpiloted_input_signals() != 0):
+                first_layer_gates.append(ip)
+        #i segnali di input di module gate = Unione di tutti i segnali di input di first layer gate
+        self.number_of_inputs =0 #viene calcolato in automatico
+        self.input_gates_dict.clear() #viene calcolato in automatico
+        for flg in first_layer_gates:
+            for flg_input_gate_ix in range(flg.number_of_inputs):  # Fixed iteration
+                if(not flg.is_input_signal_piloted(flg_input_gate_ix)):
+                    self.set_input_signal_to_flg_input_signal(self.number_of_inputs, flg, flg_input_gate_ix)
+                    self.number_of_inputs += 1
+
+#!BASIC GATE PRINTS:
+
+def print_input_signal_status(self, input_signal_ix:int, lvl:int =0): 
+        pilot_gate, pilot_gate_output_signal_ix = self.input_gates_dict.get(input_signal_ix)
+        pilot_gate_info:str = "/"
+        if(pilot_gate != None):
+            pilot_gate_info = pilot_gate.name
+        before:str = ""
+        for i in range(lvl):
+            before += " >"
+        if(lvl == 0):
+            before += "O"
+        print(before+ " Signal IX: "+str(input_signal_ix)+" of "+self.name+" |PILOT_GATE: " +str(pilot_gate_info) + "PILOT_GATE_OUTPUT_SIGNAL_IX: "+ str(pilot_gate_output_signal_ix) +" |----------------| STATUS: "+ str(self.input_signals_list[input_signal_ix]))
+
+    def print_all_input_signals_status(self): 
+        print("@ Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
+        for input_signal_ix in range(self.number_of_inputs):
+            self.print_input_signal_status(input_signal_ix, 0)
+            print("----------------")
+
+    def print_output_signal_status(self, output_signal_ix:int, lvl:int): 
+        before:str=""
+        for i in range(lvl):
+            before += " >"
+        if(lvl == 0):
+            before += "O"
+        print(before+ " Signal IX: "+str(output_signal_ix)+" of "+self.name + " |----------------| STATUS: "+ str(self.input_signals_list[output_signal_ix]))
+        if(len(self.child_gates_set) >0):
+            print("PILOTS CHILD GATES: ")
+            for cg, cg_is_ix in self.child_gates_set:
+                print(" -> ("+ str(cg) +") on INPUT_SIGNAL_IX: "+ str(cg_is_ix))
+
+    def print_all_output_signals_status(self): 
+        print("@ OUTPUT SIGNALS - Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
+        for input_signal_ix in range(self.number_of_inputs):
+            self.print_output_signal_status(input_signal_ix, 0)
+            print("----------------")
+
+#!MODULE GATE PRINT
+
+def print_input_signal_status(self, input_signal_ix:int, lvl:int): 
+        nome_segnale: str = self.input_gates_names_dict.get(input_signal_ix)
+        if nome_segnale is None:
+            nome_segnale = "/"
+        before:str=""
+        for i in range(lvl):
+            before += " >"
+        if(lvl == 0):
+            before += "O"
+        print(before+" Signal name: " + nome_segnale + " |IX: " + str(input_signal_ix) + " of " + self.name)
+        for internal_gate, internal_ix in self.input_gates_dict.get(input_signal_ix):
+            internal_gate.print_input_signal_status(internal_ix, lvl+1)
+
+    def print_all_input_signals_status(self): 
+        print("@ INPUT SIGNALS - Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
+        for input_signal_ix in range(self.number_of_inputs):
+            self.print_input_signal_status(input_signal_ix, 0)
+            print("----------------")
+
+    def print_output_signal_status(self, output_signal_ix:int, lvl:int):
+        nome_segnale: str = self.input_gates_names_dict.get(output_signal_ix)
+        if nome_segnale is None:
+            nome_segnale = "/"
+        before:str=""
+        for i in range(lvl):
+            before += " >"
+        if(lvl == 0):
+            before += "O"
+        print(before+ " Signal name: " + nome_segnale + " |IX: " + str(output_signal_ix) + " of " + self.name)
+        internal_gate, internal_ix = self.output_gates_dict.get(output_signal_ix)
+        internal_gate.print_output_signal_status(internal_ix, lvl+1)
+
+    def print_all_output_signals_status(self): 
+        print("@ OUTPUT SIGNALS - Traccia di tutti i segnali interni collegati, l'ultimo e' di una BasicPort:")
+        for output_signal_ix in range(self.number_of_inputs):
+            self.print_output_signal_status(output_signal_ix, 0)
+            print("----------------")
