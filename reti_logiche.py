@@ -82,9 +82,6 @@ class AbstractGate(LogicClass):
 
     def input_gates_results_set_input_signals(self, input_signal_ix): 
         pass
-
-    def get_internal_gates_piloted_by_input_signal_ix(self, input_signal_ix:int=0):
-        return [self]
     
     def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
         pass #I need this method here to end the recursion when I reach a BasicGate
@@ -109,7 +106,6 @@ class ModuleGate(AbstractGate):
             self.internal_gates_affected_by_input_signal_ix[i] = set()
 
         self.internal_gates_affected_by_last_level_signal_changes:set[(AbstractGate,int)] = set() #you aways have to .clear() it
-        
         
         
         self.output_signals_list:list[SIGNAL] = []
@@ -148,24 +144,17 @@ class ModuleGate(AbstractGate):
             internal_gate._update_internal_gates_affected_by_last_level_signal_changes(internal_gate_input_signal_ix)
 
     #aneurysm = useless optimization: not all internal_gates_affected_by_input_signal_ix gates but only the affected by input ones
-    def get_internal_gates_piloted_by_input_signal_ix(self, input_signal_ix:int):
-        internal_gates_piloted_by_input_signal_ix:set[AbstractGate, int] = self.internal_gates_affected_by_input_signal_ix.get(input_signal_ix)
-        res:set[BasicGate] = {}
-        for ig, ig_input_ix in internal_gates_piloted_by_input_signal_ix:
-            ig.get_internal_gates_piloted_by_input_signal_ix(ig_input_ix)
-        return res
-
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
-        affected_basic_gates:set[BasicGate] = set()
+    def compute_result_and_returns_gates_affeted_by_the_result(self, compute_all__internal_gates_affected_by_module_input_signals:bool=False):
+        if(compute_all__internal_gates_affected_by_module_input_signals):
+            for ix in range(self.number_of_inputs):
+                self.internal_gates_affected_by_last_level_signal_changes.update(self.internal_gates_affected_by_input_signal_ix.get(ix))
+        gates_affected_by_the_result:set[AbstractGate] = set()
         for ig, ig_input_signal_ix in self.internal_gates_affected_by_last_level_signal_changes:
             print("ig: "+str(ig))
-            affected_basic_gates.update(ig.get_internal_gates_piloted_by_input_signal_ix(ig_input_signal_ix))
+            gates_affected_by_the_result.update(ig.compute_result_and_returns_gates_affeted_by_the_result())
         self.internal_gates_affected_by_last_level_signal_changes.clear()
         #^^^ LVL1[compute_result, set_signals<-also sets internal_gates_affected_by_last_level_signal_changes] -> LVL2[compute_result<-right now, set_signals]
         
-        gates_affected_by_the_result:set[BasicGate] = set()
-        for abg in affected_basic_gates:
-            gates_affected_by_the_result.update(abg.compute_result_and_returns_gates_affeted_by_the_result())
         return gates_affected_by_the_result
 
     def _get_output_signal(self, output_ix):
@@ -400,7 +389,7 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
 
 switch1 = SwitchGate()
 switch2 = SwitchGate()
-
+'''
 or_internal_1 = OR(name="or_internal_1", n_input_signals=1)
 or1 = OR([(switch1,0)], n_input_signals=1, name="or1")  # Changed from NOT to OR with 1 input
 or2 = OR(n_input_signals=1, name="or2")  # Set n_input_signals=1
@@ -417,12 +406,17 @@ prova_ext.set_module_gate_output_signal_to_internal_gate_output_signal((prova_in
 or1.connect_input_gate_to_input_signal((switch1,0),0)
 print(prova_ext.internal_gates_that_pilots_output_signal_ix)
 or2.connect_input_gate_to_input_signal((prova_ext,0),0)
+'''
 
-run_simulation()
+'''
+not1 = NOT(name="not1")
+not2 = NOT(name="not2", input_gate=(not1,0))
+not1.connect_input_gate_to_input_signal((not2,0),0)
+'''
+not1 = NOT(name="not1")
+not1.connect_input_gate_to_input_signal((not1,0),0)
+run_simulation()#you should pass in a list
 
-print(prova_int.internal_gates_affected_by_last_level_signal_changes)
-#print(prova.internal_gates_affected_by_last_level_signal_changes)
-print(or_internal_1.input_signals_list[0].val)
 
 
 
