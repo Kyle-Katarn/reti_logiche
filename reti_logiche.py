@@ -85,6 +85,9 @@ class AbstractGate(LogicClass):
 
     def get_internal_gates_piloted_by_input_signal_ix(self, input_signal_ix:int=0):
         return [self]
+    
+    def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
+        pass #I need this method here to end the recursion when I reach a BasicGate
 
 
     
@@ -123,7 +126,7 @@ class ModuleGate(AbstractGate):
 
     def set_module_gate_input_signal_to_internal_gate_input_signal(self, first_layer_gate_tup:tuple[AbstractGate,int], self_input_signal_ix:int, name:str = '/'):
         first_layer_gate, flg_input_signal_ix = first_layer_gate_tup
-        self.input_signals_list[self_input_signal_ix].extend(first_layer_gate._get_input_signal(flg_input_signal_ix))#!___
+        self.input_signals_list[self_input_signal_ix].extend(first_layer_gate._get_input_signal(flg_input_signal_ix))#!___ok
         self.internal_gates_affected_by_input_signal_ix[self_input_signal_ix].add((first_layer_gate,flg_input_signal_ix))
         self.input_signals_name[self_input_signal_ix] = name
 
@@ -135,20 +138,27 @@ class ModuleGate(AbstractGate):
         for s in self.input_signals_list[input_signal_ix]:
             s.val = input_gate_res
 
-        self.internal_gates_affected_by_last_level_signal_changes.update(self.internal_gates_affected_by_input_signal_ix.get(input_signal_ix))
+        #self.internal_gates_affected_by_last_level_signal_changes.update(self.internal_gates_affected_by_input_signal_ix.get(input_signal_ix))#!__chiama ricorsivamente fino a basic gate
+        self._update_internal_gates_affected_by_last_level_signal_changes(input_signal_ix)
         #*modifichi SIGNAL dell'internal gate
+
+    def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
+        self.internal_gates_affected_by_last_level_signal_changes.update(self.internal_gates_affected_by_input_signal_ix.get(input_signal_ix))
+        for internal_gate, internal_gate_input_signal_ix in self.internal_gates_affected_by_last_level_signal_changes:
+            internal_gate._update_internal_gates_affected_by_last_level_signal_changes(internal_gate_input_signal_ix)
 
     #aneurysm = useless optimization: not all internal_gates_affected_by_input_signal_ix gates but only the affected by input ones
     def get_internal_gates_piloted_by_input_signal_ix(self, input_signal_ix:int):
         internal_gates_piloted_by_input_signal_ix:set[AbstractGate, int] = self.internal_gates_affected_by_input_signal_ix.get(input_signal_ix)
         res:set[BasicGate] = {}
         for ig, ig_input_ix in internal_gates_piloted_by_input_signal_ix:
-            ig.internal_gates_piloted_by_input_signal_ix(ig_input_ix)
+            ig.get_internal_gates_piloted_by_input_signal_ix(ig_input_ix)
         return res
 
     def compute_result_and_returns_gates_affeted_by_the_result(self):
         affected_basic_gates:set[BasicGate] = set()
         for ig, ig_input_signal_ix in self.internal_gates_affected_by_last_level_signal_changes:
+            print("ig: "+str(ig))
             affected_basic_gates.update(ig.get_internal_gates_piloted_by_input_signal_ix(ig_input_signal_ix))
         self.internal_gates_affected_by_last_level_signal_changes.clear()
         #^^^ LVL1[compute_result, set_signals<-also sets internal_gates_affected_by_last_level_signal_changes] -> LVL2[compute_result<-right now, set_signals]
@@ -250,7 +260,7 @@ class BasicGate(AbstractGate):
         return self.output_signal.val
     
     def _get_input_signal(self, input_ix): 
-        return self.input_signals_list[input_ix]
+        return [self.input_signals_list[input_ix]]
     
     def _get_output_signal(self, input_ix=0): 
         return self.output_signal
@@ -364,6 +374,7 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
     print("LEVEL: ", level)
 
     while len(current_level_gates) > 0 and iterations < max_iterations:
+        #print("current_level_gates: "+str(current_level_gates))
         iterations += 1
         current_gate:AbstractGate = current_level_gates.pop()
         current_gate_children_tup = current_gate.compute_result_and_returns_gates_affeted_by_the_result()
@@ -371,7 +382,6 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
             for child_gate, _ in current_gate_children_tup:
                 next_level_gates.add(child_gate)
             next_level_gates_signals_to_update.update(current_gate_children_tup)
-        #print(current_gate)
 
         if len(current_level_gates) == 0:
             level += 1
@@ -394,11 +404,11 @@ switch2 = SwitchGate()
 or_internal_1 = OR(name="or_internal_1", n_input_signals=1)
 or1 = OR([(switch1,0)], n_input_signals=1, name="or1")  # Changed from NOT to OR with 1 input
 or2 = OR(n_input_signals=1, name="or2")  # Set n_input_signals=1
-prova_int:ModuleGate = ModuleGate([or_internal_1],1,1)
+prova_int:ModuleGate = ModuleGate([or_internal_1],1,1,name="prova_int")
 prova_int.set_module_gate_input_signal_to_internal_gate_input_signal((or_internal_1,0),0)
 prova_int.set_module_gate_output_signal_to_internal_gate_output_signal((or_internal_1,0),0)
 
-prova_ext:ModuleGate = ModuleGate([prova_int],1,1)
+prova_ext:ModuleGate = ModuleGate([prova_int],1,1,name="prova_ext")
 
 prova_ext.connect_input_gate_to_input_signal((or1,0),0)
 prova_ext.set_module_gate_input_signal_to_internal_gate_input_signal((prova_int,0),0)
@@ -410,8 +420,9 @@ or2.connect_input_gate_to_input_signal((prova_ext,0),0)
 
 run_simulation()
 
-print(or_internal_1.get_output_signal_value())
+print(prova_int.internal_gates_affected_by_last_level_signal_changes)
 #print(prova.internal_gates_affected_by_last_level_signal_changes)
+print(or_internal_1.input_signals_list[0].val)
 
 
 
