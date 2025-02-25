@@ -25,6 +25,12 @@ class LogicClass:
 
     def get_name(self):
         return self.name
+    
+    def get_all_child_gates(self):
+        pass
+    
+    def get_all_input_gates(self):
+        pass
 
 
 
@@ -48,6 +54,9 @@ class SwitchGate(LogicClass):
     
     def get_output_signal_value(self, ix=0):
         return self.output_signal
+    
+    def get_all_child_gates(self):
+        return self.child_gates_set
 
     def print_child_gates(self):
         print("Child gates of(", self, "): ")
@@ -81,10 +90,34 @@ class AbstractGate(LogicClass):
             first_ix += 1
 
     def input_gates_results_set_input_signals(self, input_signal_ix): 
-        pass
+        pass 
     
     def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
-        pass #I need this method here to end the recursion when I reach a BasicGate
+        pass #I need this method to end the recursion when I reach a BasicGate
+
+    def _get_all_internal_basic_gates(self):
+        return [self] #I need this method to end the recursion when I reach a BasicGate
+
+    def get_child_gates_by_output_signal_index(self, ix:int):
+        return self.child_gates_dict.get(ix)
+    
+    def get_all_child_gates(self):
+        ris:set[tuple[AbstractGate,int]] = set()
+        for ix in range(self.number_of_outputs):
+            ris.update(self.get_child_gates_by_output_signal_index(ix))
+        return ris
+
+    def get_input_gate_by_input_signal_index(self, ix:int):
+        return self.input_gates_dict.get(ix)
+
+    def get_all_input_gates(self):
+        ris:set[tuple[AbstractGate,int]] = set()
+        for ix in range(self.number_of_inputs):
+            ris.update(self.get_input_gate_by_input_signal_index(ix))
+        return ris
+
+
+
 
 
     
@@ -181,6 +214,12 @@ class ModuleGate(AbstractGate):
     
     def get_output_signal_value(self, ix=0):
         return self.output_signals_list[ix].val
+    
+    def _get_all_internal_basic_gates(self):
+        ris:set[tuple[BasicGate,int]] = set()
+        for ig in self.internal_gates:
+            ris.update(ig._get_all_internal_basic_gates())
+        return ris
 
 
 

@@ -85,32 +85,36 @@ class VisualGate:
 
 
 
-def ordinamento_topologico_helper(gate: AbstractGate, stack: list[AbstractGate], visited: set[AbstractGate]):
+def ordinamento_topologico_helper(gate: LogicClass, stack: list[LogicClass], visited: set[LogicClass]):
     visited.add(gate)
-    for child_gate in gate.output_to_gates:
+    for child_gate, child_gate_input_ix in gate.get_all_child_gates():
         if child_gate not in visited:
             ordinamento_topologico_helper(child_gate, stack, visited)
     stack.append(gate)
 
-def ordinamento_topologico(lista_gate: list[Gate]):
-    stack:list[Gate] = []
-    visited:set[Gate] = set()
+def ordinamento_topologico(lista_gate: list[LogicClass]):
+    stack:list[LogicClass] = []
+    visited:set[LogicClass] = set()
 
-    for gate in lista_gate:
+    for gate, gate_input_ix in lista_gate:
         if gate not in visited:
             ordinamento_topologico_helper(gate, stack, visited)
     return stack
 
 
-def get_gates_level_BFS():
-    gates_to_execute:list[Gate] = []
-    gates_to_execute.append(GLOBAL_TRUE)
-    gates_to_execute.append(GLOBAL_FALSE)
+def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_GATES_LIST, considered_switches:list[LogicClass] = GLOBAL_ALL_SWITCHES_LIST):
+    dict_gate_to_BFS_level:dict[LogicClass,int] = dict()
+    gates_to_execute:list[LogicClass] = []
+    gates_to_execute.extend(GLOBAL_ALL_SWITCHES_LIST)
+    for g in considered_gates:
+        if(len(g.get_all_input_gates()) == 0):
+            considered_gates.append(g)
+
     number_of_gates_in_level:int = len(gates_to_execute)
     level:int = 0
 
     while(not len(gates_to_execute) == 0):
-        current_gate:Gate = gates_to_execute.pop(0)
+        current_gate:LogicClass = gates_to_execute.pop(0)
         dict_gate_to_BFS_level[current_gate] = level
         number_of_gates_in_level -= 1
 
@@ -118,16 +122,17 @@ def get_gates_level_BFS():
             level += 1
 
 
-def create_visual_gates(lista_gate: list[Gate]):
-    lista_gate_ordinata:list[Gate] = ordinamento_topologico(lista_gate)
-    lista_gate_ordinata.reverse()
-    #print("lista_gate_ordinata: ", lista_gate_ordinata)
-    visual_gates = []
+def create_visual_gates(lista_gate: list[LogicClass] = GLOBAL_ALL_GATES_LIST, dict_gate_to_BFS_level:dict[LogicClass, int]):
+    #todo 1 -> tutti i gate puntati da 1 -> 2. ->
+    
+    visual_gates:set[VisualGate] = []
     x, y = -100, 50
-    dict_logic_to_visual_gates:dict[Gate, VisualGate] = {}
+    dict_logic_to_visual_gates:dict[LogicClass, VisualGate] = {}
+    number_of_BFS_levels #!----
+    dict_BFS_level_to_next_y_coo:dict[int, int] = {}
 
     previous_gate_level:int = -1
-    for child_gate in lista_gate_ordinata:
+    for child_gate in lista_gate:
         if dict_gate_to_BFS_level[child_gate] == previous_gate_level:
             print(child_gate, previous_gate_level)
             y += 100
