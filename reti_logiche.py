@@ -4,7 +4,7 @@ Una porta sia aggiunge al livello N se uno dei suoi pin dipende da una porta al 
 NON è necessario che tutti i pin dipendano da porte al livello N-1
 '''
 
-GLOBAL_ALL_GATES_LIST:list['AbstractGate'] = []
+GLOBAL_ALL_BASIC_GATES_LIST:list['AbstractGate'] = []
 GLOBAL_ALL_SWITCHES_LIST:list['AbstractGate'] = []
 
 class SIGNAL():
@@ -68,13 +68,15 @@ class SwitchGate(LogicClass):
 class AbstractGate(LogicClass):
     def __init__(self, number_of_inputs, number_of_outputs, name: str = "AbstractGate"):
         super().__init__(number_of_inputs, number_of_outputs, name)
-        GLOBAL_ALL_GATES_LIST.append(self)
+        GLOBAL_ALL_BASIC_GATES_LIST.append(self)
         self.input_gates_dict:dict[int, tuple['AbstractGate', int]] = {} #*input_gate e l'ix del segnale di output di input_gate
         self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
         for i in range(self.number_of_outputs):
             self.child_gates_dict[i] = set()
 
-    def connect_input_gate_to_input_signal(self, param: tuple["AbstractGate", int], input_signal_ix:int):
+    def connect_input_gate_to_input_signal(self, param: tuple["LogicClass", int], input_signal_ix:int):
+        if not isinstance(param, tuple):
+            raise Exception(f"@@@INTERNAL ERROR: connect_input_gate_to_input_signal() WANTS a TUPLE")
         if input_signal_ix >= self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
         self.input_gates_dict[input_signal_ix] = param
@@ -82,6 +84,8 @@ class AbstractGate(LogicClass):
         input_gate.add_child_gate((self, input_signal_ix))
 
     def connect_multiple_input_gates_to_input_signals(self, param:list[tuple["AbstractGate",int]], first_ix:int =0):
+        if not isinstance(param, list):
+            raise Exception(f"@@@INTERNAL ERROR: connect_multiple_input_gates_to_input_signals() WANTS a LIST")
         if first_ix + len(param) > self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your last index index: " + str(first_ix + len(param) - 1) + " last available index: " + str((self.number_of_inputs)-1))
 
@@ -108,16 +112,17 @@ class AbstractGate(LogicClass):
         return ris
 
     def get_input_gate_by_input_signal_index(self, ix:int):
-        return self.input_gates_dict.get(ix)
+        ris = self.input_gates_dict.get(ix)
+        #print("ris: "+ str(ris))
+        if(ris == None):
+            raise Exception(f"@@@INTERNAL ERROR: input_gate at ix {ix} is None")
+        return ris
 
     def get_all_input_gates(self):
         ris:set[tuple[AbstractGate,int]] = set()
         for ix in range(self.number_of_inputs):
-            ris.update(self.get_input_gate_by_input_signal_index(ix))
+            ris.add(self.get_input_gate_by_input_signal_index(ix))
         return ris
-
-
-
 
 
     
@@ -389,7 +394,7 @@ def apply_SwitchGates_immediatly(considered_switches:list[SwitchGate]):
                 
 
 #!funziona solo con BASIC GATE
-def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = GLOBAL_ALL_GATES_LIST, considered_switches:list[SwitchGate] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le gates
+def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = GLOBAL_ALL_BASIC_GATES_LIST, considered_switches:list[SwitchGate] = GLOBAL_ALL_SWITCHES_LIST):#se non passo la rete logica, eseguo tutte le gates
     apply_SwitchGates_immediatly(considered_switches)
 
     current_level_gates:set[AbstractGate] = set()
@@ -426,8 +431,8 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
 #? SITAX: list[(Gate0, Gate0_output_signal_ix), (Gate1, Gate1_output_signal_ix)]; Gate0 input_gates_dict[ix=0], Gate1 input_gates_dict[ix=1];
 
 
-switch1 = SwitchGate()
-switch2 = SwitchGate()
+switch1 = SwitchGate(name="switch1")
+switch2 = SwitchGate(name="switch2")
 '''
 or_internal_1 = OR(name="or_internal_1", n_input_signals=1)
 or1 = OR([(switch1,0)], n_input_signals=1, name="or1")  # Changed from NOT to OR with 1 input
@@ -453,8 +458,16 @@ not2 = NOT(name="not2", input_gate=(not1,0))
 not1.connect_input_gate_to_input_signal((not2,0),0)
 '''
 not1 = NOT(name="not1")
-not1.connect_input_gate_to_input_signal((not1,0),0)
-run_simulation()#you should pass in a list
+not2 = NOT(name="not2", input_gate=(not1,0))
+not1.connect_input_gate_to_input_signal((not2,0),0)
+prova:ModuleGate = ModuleGate([not1,not2], 2,2)
+prova.set_module_gate_input_signal_to_internal_gate_input_signal((not1,0),0)
+prova.set_module_gate_input_signal_to_internal_gate_input_signal((not2,0),1)
+prova.set_module_gate_output_signal_to_internal_gate_output_signal((not1,0),0)
+prova.set_module_gate_output_signal_to_internal_gate_output_signal((not2,0),1)
+prova.connect_multiple_input_gates_to_input_signals([(switch1,0),(switch2,1)])
+#print(prova.get_all_input_gates())
+#run_simulation()#you should pass in a list
 
 
 
