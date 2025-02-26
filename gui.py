@@ -13,22 +13,23 @@ LIGHTBLUE = (173, 216, 230)
 WHITE = (255, 255, 255)
 
 class VisualConnection:
-    def __init__(self, start_gate: "VisualGate", end_gate: "VisualGate", pin_index: int = 1):
-        self.start_gate: "VisualGate" = start_gate
-        self.end_gate: "VisualGate" = end_gate
-        #start_gate only output pin
-        self.start_x = start_gate.x + start_gate.width
-        self.start_y = start_gate.y + start_gate.height//2
-        
-        self.end_x = end_gate.x
-        if isinstance(end_gate.gate, (AND, OR, NAND, NOR)):
-            self.end_y = end_gate.y + end_gate.height//3 if pin_index == 1 else end_gate.y + 2*end_gate.height//3
-        else:
-            self.end_y = end_gate.y + end_gate.height//2
+    def __init__(self, start_gate_tup: tuple["VisualGate",int], end_gate_tip: tuple["VisualGate",int]):
+        self.start_gate:VisualGate = start_gate_tup[0]
+        self.start_gate_ix:int = start_gate_tup[1]
+        self.end_gate: VisualGate = end_gate_tip[0]
+        self.end_gate_ix:int = end_gate_tip[1]
+        #start_gate output pin coo
+        self.start_x = self.start_gate.x + self.start_gate.width
+        start_y_segment:int = self.start_gate.height//(self.start_gate.gate.number_of_outputs+1)
+        self.start_y = self.start_gate.y + start_y_segment*(self.start_gate_ix+1)
+        #end_gate input pin coo
+        self.end_x = self.end_gate.x
+        end_y_segment:int = self.end_gate.height//(self.end_gate.gate.number_of_inputs+1)
+        self.end_y = self.end_gate.y + end_y_segment*(self.end_gate_ix+1)
     
     def draw(self, screen):
         color = BLACK
-        if(self.start_gate.gate.get_output_signal_status()):
+        if(self.start_gate.gate.get_output_signal_value(self.start_gate_ix)):
             color = RED
             
         pygame.draw.line(screen, color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
@@ -78,8 +79,8 @@ class VisualGate:
             connection.draw(screen)
             
         
-    def add_connection(self, end_gate: "VisualGate", pin_index: int = 1):
-        connection = VisualConnection(self, end_gate, pin_index)
+    def add_connection(self, end_gate_tup:tuple["VisualGate",int], starting_pin_ix:int):
+        connection = VisualConnection((self, starting_pin_ix), end_gate_tup)
         self.visual_connections.append(connection)
 
 
@@ -108,6 +109,7 @@ def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GAT
     starting_gates:list[LogicClass] = []
     starting_gates.extend(considered_switches)
     for g in considered_gates:
+        print("gate: "+ str(g) + str(g.get_all_input_gates()))
         if(len(g.get_all_input_gates()) == 0):
             considered_gates.append(g)
     get_gates_level_BFS_helper(starting_gates,considered_gates,visited_gates_set, dict_gate_to_BFS_level)#se non ci sono cicli basta questo
@@ -115,7 +117,8 @@ def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GAT
 
     for gate in considered_gates: #*necessario per A -> B e B -> A
         if gate not in visited_gates_set:
-            get_gates_level_BFS_helper([gate],considered_switches,visited_gates_set, dict_gate_to_BFS_level)
+            visited_gates_set.add(gate)
+            get_gates_level_BFS_helper([gate],considered_gates,visited_gates_set, dict_gate_to_BFS_level)
 
     return dict_gate_to_BFS_level
 
@@ -128,13 +131,14 @@ def get_gates_level_BFS_helper(starting_gates:list[LogicClass], considered_gates
 
     while(not len(gates_to_execute) == 0):
         current_gate:LogicClass = gates_to_execute.pop(0)
-        print("@@@@@@current_gate: "+str(current_gate))
+        #print("@@current_gate: " +str(current_gate))
         for gate, ix in current_gate.get_all_child_gates():
-            print("ponted gate: " +str(gate))
+            #print("----near_gate: " +str(current_gate))
+            #print("--(near_gate not in visited_gates_set): "+str((gate not in visited_gates_set)))
+            #print("--(near_gate in considered_gates): "+str((gate in considered_gates)))
             if (gate not in visited_gates_set) and (gate in considered_gates):
                 gates_to_execute.append(gate)
                 visited_gates_set.add(gate)
-                print("---gates_to_execute: "+str(gates_to_execute))
         dict_gate_to_BFS_level[current_gate] = level
         number_of_gates_in_level -= 1
 
@@ -143,7 +147,7 @@ def get_gates_level_BFS_helper(starting_gates:list[LogicClass], considered_gates
     return dict_gate_to_BFS_level
 
 
-def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], lista_gate: list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, lista_switch = GLOBAL_ALL_SWITCHES_LIST):
+def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered_gates: list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_swiches = GLOBAL_ALL_SWITCHES_LIST):
     #todo 1 -> tutti i gate puntati da 1 -> 2. ->
     
     visual_gates:set[VisualGate] = []
@@ -152,8 +156,8 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], lista_gate
     dict_BFS_level_to_next_y_coo:dict[int, int] = {}
 
     lista_obj:list[LogicClass] = []
-    lista_obj.extend(lista_gate)
-    lista_obj.extend(lista_switch)
+    lista_obj.extend(considered_gates)
+    lista_obj.extend(considered_swiches)
     for gate in lista_obj:
         child_gate_level:int = dict_gate_to_BFS_level.get(gate)
         #print("gate: "+str(gate)+" |level: "+str(child_gate_level))
@@ -164,21 +168,29 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], lista_gate
         dict_BFS_level_to_next_y_coo[child_gate_level] += 100
         x:int = child_gate_level*150 +50
             
-        #print("gate: ", gate, " level: ", dict_gate_to_BFS_level[gate])
         visual_child_gate = VisualGate(gate, x, y)
         dict_logic_to_visual_gates[gate] = visual_child_gate
         visual_gates.append(visual_child_gate)
 
-        #altro
-
+    for father_gate in lista_obj:
+        for father_gate_output_ix in range(father_gate.number_of_outputs):
+            child_gates_of_output_ix:set[tuple[AbstractGate,int]] = father_gate.get_child_gates_dict()[father_gate_output_ix]
+            for child_gate, child_gate_input_ix in child_gates_of_output_ix:
+                visual_father_gate:VisualGate = dict_logic_to_visual_gates[father_gate]
+                visual_child_gate:VisualGate = dict_logic_to_visual_gates[child_gate]
+                visual_father_gate.add_connection((visual_child_gate,child_gate_input_ix), father_gate_output_ix)
     return visual_gates
         
 
 
+def auto_placement(considered_gates=GLOBAL_ALL_BASIC_GATES_LIST, considered_switches=GLOBAL_ALL_SWITCHES_LIST):
+    gates_to_BFS_levels:dict[LogicClass,int] = get_gates_level_BFS(considered_gates=considered_gates, considered_switches=GLOBAL_ALL_SWITCHES_LIST)
+    #print("gates_to_BFS_levels: "+ str(gates_to_BFS_levels))
+    visual_gates:list[VisualGate] = create_visual_gates(dict_gate_to_BFS_level=gates_to_BFS_levels, considered_gates = considered_gates)
+    return visual_gates
 
-gates_to_BFS_levels:dict[LogicClass,int] = get_gates_level_BFS()
-print("gates_to_BFS_levels: "+ str(gates_to_BFS_levels))
-visual_gates:list[VisualGate] = create_visual_gates(dict_gate_to_BFS_level=gates_to_BFS_levels)
+considered_gates=[not1,not2]
+visual_gates = auto_placement(considered_gates=considered_gates)
 
 # Main game loop
 running = True

@@ -30,7 +30,7 @@ class LogicClass:
         pass
     
     def get_all_input_gates(self):
-        pass
+        return set()
 
 
 
@@ -57,6 +57,11 @@ class SwitchGate(LogicClass):
     
     def get_all_child_gates(self):
         return self.child_gates_set
+    
+    def get_child_gates_dict(self):
+        res = dict()
+        res[0] = self.get_all_child_gates()
+        return res
 
     def print_child_gates(self):
         print("Child gates of(", self, "): ")
@@ -68,7 +73,6 @@ class SwitchGate(LogicClass):
 class AbstractGate(LogicClass):
     def __init__(self, number_of_inputs, number_of_outputs, name: str = "AbstractGate"):
         super().__init__(number_of_inputs, number_of_outputs, name)
-        GLOBAL_ALL_BASIC_GATES_LIST.append(self)
         self.input_gates_dict:dict[int, tuple['AbstractGate', int]] = {} #*input_gate e l'ix del segnale di output di input_gate
         self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
         for i in range(self.number_of_outputs):
@@ -110,6 +114,9 @@ class AbstractGate(LogicClass):
         for ix in range(self.number_of_outputs):
             ris.update(self.get_child_gates_by_output_signal_index(ix))
         return ris
+    
+    def get_child_gates_dict(self):
+        return self.child_gates_dict
 
     def get_input_gate_by_input_signal_index(self, ix:int):
         ris = self.input_gates_dict.get(ix)
@@ -231,6 +238,7 @@ class ModuleGate(AbstractGate):
 class BasicGate(AbstractGate):
     def __init__(self, input_gates_list:list['BasicGate'], number_of_inputs:int = 2, name:str = "GateWithInput"):
         super().__init__(number_of_inputs=number_of_inputs, number_of_outputs=1, name=name)
+        GLOBAL_ALL_BASIC_GATES_LIST.append(self)
         self.input_signals_list:list[SIGNAL] = []
         self.number_of_outputs:int = 1
         self.output_signal:SIGNAL = SIGNAL()
@@ -452,10 +460,12 @@ print(prova_ext.internal_gates_that_pilots_output_signal_ix)
 or2.connect_input_gate_to_input_signal((prova_ext,0),0)
 '''
 
-'''
+
+#ciclo
 not1 = NOT(name="not1")
 not2 = NOT(name="not2", input_gate=(not1,0))
 not1.connect_input_gate_to_input_signal((not2,0),0)
+
 '''
 not1 = NOT(name="not1")
 not2 = NOT(name="not2", input_gate=(not1,0))
@@ -466,6 +476,7 @@ prova.set_module_gate_input_signal_to_internal_gate_input_signal((not2,0),1)
 prova.set_module_gate_output_signal_to_internal_gate_output_signal((not1,0),0)
 prova.set_module_gate_output_signal_to_internal_gate_output_signal((not2,0),1)
 prova.connect_multiple_input_gates_to_input_signals([(switch1,0),(switch2,1)])
+'''
 #print(prova.get_all_input_gates())
 #run_simulation()#you should pass in a list
 
