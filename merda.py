@@ -239,3 +239,21 @@ def print_input_signal_status(self, input_signal_ix:int, lvl:int):
         for output_signal_ix in range(self.number_of_inputs):
             self.print_output_signal_status(output_signal_ix, 0)
             print("----------------")
+
+
+##NON SERVE
+def ordinamento_topologico_helper(gate: LogicClass, stack: list[LogicClass], visited: set[LogicClass]):
+    visited.add(gate)
+    for child_gate, child_gate_input_ix in gate.get_all_child_gates():
+        if child_gate not in visited:
+            ordinamento_topologico_helper(child_gate, stack, visited)
+    stack.append(gate)
+
+def ordinamento_topologico(lista_gate: list[LogicClass]):
+    stack:list[LogicClass] = []
+    visited:set[LogicClass] = set()
+
+    for gate, gate_input_ix in lista_gate:
+        if gate not in visited:
+            ordinamento_topologico_helper(gate, stack, visited)
+    return stack

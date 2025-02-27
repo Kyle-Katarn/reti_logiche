@@ -1,5 +1,6 @@
 import pygame
 from reti_logiche import *
+from math import sqrt
 
 # Initialize Pygame
 pygame.init()
@@ -12,32 +13,66 @@ RED = (255, 0, 0)
 LIGHTBLUE = (173, 216, 230)
 WHITE = (255, 255, 255)
 
+GLOBAL_visual_gates:list["VisualGate"] = []
+GLOBAL_visual_connections:list["VisualConnection"] = []
+
 class VisualConnection:
-    def __init__(self, start_gate_tup: tuple["VisualGate",int], end_gate_tip: tuple["VisualGate",int]):
-        self.start_gate:VisualGate = start_gate_tup[0]
-        self.start_gate_ix:int = start_gate_tup[1]
-        self.end_gate: VisualGate = end_gate_tip[0]
-        self.end_gate_ix:int = end_gate_tip[1]
+    def __init__(self, start_gate_tup: tuple["VisualGate",int]=None, end_gate_tup: tuple["VisualGate",int]=None):
+        self.start_gate_tup:tuple["VisualGate",int] = start_gate_tup
+        self.end_gate_tup:tuple["VisualGate",int] = end_gate_tup
+        self.start_x =0
+        self.start_y =0
+        self.end_x =0
+        self.end_y =0
+        self.update_connection()
+
+    def set_end_coo(self, end_x, end_y):
+        self.end_x = end_x
+        self.end_y = end_y
+
+    def update_connection(self):
+        self.start_gate:VisualGate = self.start_gate_tup[0]
+        self.start_gate_ix:int = self.start_gate_tup[1]
+        self.end_gate: VisualGate = self.end_gate_tup[0]
+        self.end_gate_ix:int = self.end_gate_tup[1]
         #start_gate output pin coo
         self.start_x = self.start_gate.x + self.start_gate.width
         start_y_segment:int = self.start_gate.height//(self.start_gate.gate.number_of_outputs+1)
         self.start_y = self.start_gate.y + start_y_segment*(self.start_gate_ix+1)
         #end_gate input pin coo
-        self.end_x = self.end_gate.x
-        end_y_segment:int = self.end_gate.height//(self.end_gate.gate.number_of_inputs+1)
-        self.end_y = self.end_gate.y + end_y_segment*(self.end_gate_ix+1)
-    
+        if(self.end_gate_tup == None):
+            self.end_x = self.end_gate.x
+            end_y_segment:int = self.end_gate.height//(self.end_gate.gate.number_of_inputs+1)
+            self.end_y = self.end_gate.y + end_y_segment*(self.end_gate_ix+1)
+        
     def draw(self, screen):
+        self.update_connection()
         color = BLACK
         if(self.start_gate.gate.get_output_signal_value(self.start_gate_ix)):
             color = RED
-            
         pygame.draw.line(screen, color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
 
+
+class VisualPin:
+    CONST_hitbox_scaling:int = 2
+    def __init__(self, x:int, y:int, rad:int, type:str):
+        self.type:str = type
+        self.center_x = x
+        self.center_y = y
+        self.radious = rad
+
+    def visual_pin_conains_point(self, px: int, py: int):
+        Dx:int = px-self.center_x
+        Dy:int = py-self.center_y
+        return sqrt(Dx**2 + Dy**2) <= self.radious * self.CONST_hitbox_scaling
+
+    def draw(self, pin_color):
+        pygame.draw.circle(screen, pin_color, (self.center_x, self.center_y), self.radious)
 
 class VisualGate:
     def __init__(self, gate: BasicGate, x: int, y: int):
         self.visual_connections: list[VisualConnection] = []
+        self.visual_pins: list[VisualPin] = []
         self.gate = gate
         self.x = x
         self.y = y
@@ -46,6 +81,37 @@ class VisualGate:
         max_pins = max(gate.number_of_inputs, gate.number_of_outputs)
         self.height = max(60, max_pins * 30)
         self.pin_radius = 5
+        self.is_dragging = False
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
+
+    #*Gestione SPOSTAMENTO RETTANGOLO
+    def visual_gate_contains_point(self, x: int, y: int) -> bool:
+        return (self.x <= x <= self.x + self.width and 
+                self.y <= y <= self.y + self.height)
+
+    def visual_gate_start_drag(self, mouse_x: int, mouse_y: int):
+        self.is_dragging = True
+        self.drag_offset_x = mouse_x - self.x
+        self.drag_offset_y = mouse_y - self.y
+
+    def visual_gate_end_drag(self):
+        self.is_dragging = False
+
+    def visual_gate_update_position(self, mouse_x: int, mouse_y: int):
+        if self.is_dragging:
+            self.x = mouse_x - self.drag_offset_x
+            self.y = mouse_y - self.drag_offset_y
+
+    #*Gestione CREAZIONE COLLEGAMENTI
+    def check_if_a_visual_pin_is_cicked(self, x: int, y: int):
+        selected_pin:VisualPin = None
+        for pin in self.visual_pins:
+            if pin.visual_pin_conains_point(x,y):
+                selected_pin = pin
+                break
+        return selected_pin
+        
 
     def draw(self, screen):
         # Draw gate body
@@ -57,22 +123,24 @@ class VisualGate:
         text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
         screen.blit(text, text_rect)
 
-        # Draw input pins
+        #* Draw input pins
         if self.gate.number_of_inputs > 0:
             spacing = self.height // (self.gate.number_of_inputs + 1)
             for i in range(self.gate.number_of_inputs):
                 pin_color = RED if self.gate.get_input_signal_value(i) else BLACK
                 y_pos = self.y + spacing * (i + 1)
-                pygame.draw.circle(screen, pin_color, (self.x, y_pos), self.pin_radius)
+                visual_pin:VisualPin = VisualPin(self.x, y_pos, self.pin_radius, "in")
+                self.visual_pins.append(visual_pin)
+                visual_pin.draw(pin_color)
 
-        # Draw output pins
+        #* Draw output pins
         spacing = self.height // (self.gate.number_of_outputs + 1)
         for i in range(self.gate.number_of_outputs):
             pin_color = RED if self.gate.get_output_signal_value(i) else BLACK
             y_pos = self.y + spacing * (i + 1)
-            pygame.draw.circle(screen, pin_color, 
-                    (self.x + self.width, y_pos), 
-                    self.pin_radius)
+            visual_pin:VisualPin = VisualPin(self.x + self.width, y_pos, self.pin_radius, "out")
+            self.visual_pins.append(visual_pin)
+            visual_pin.draw(pin_color)
             
         # Draw connections
         for connection in self.visual_connections:
@@ -83,24 +151,6 @@ class VisualGate:
         connection = VisualConnection((self, starting_pin_ix), end_gate_tup)
         self.visual_connections.append(connection)
 
-
-
-
-def ordinamento_topologico_helper(gate: LogicClass, stack: list[LogicClass], visited: set[LogicClass]):
-    visited.add(gate)
-    for child_gate, child_gate_input_ix in gate.get_all_child_gates():
-        if child_gate not in visited:
-            ordinamento_topologico_helper(child_gate, stack, visited)
-    stack.append(gate)
-
-def ordinamento_topologico(lista_gate: list[LogicClass]):
-    stack:list[LogicClass] = []
-    visited:set[LogicClass] = set()
-
-    for gate, gate_input_ix in lista_gate:
-        if gate not in visited:
-            ordinamento_topologico_helper(gate, stack, visited)
-    return stack
 
 def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_switches:list[LogicClass] = GLOBAL_ALL_SWITCHES_LIST):
     dict_gate_to_BFS_level:dict[LogicClass,int] = dict()
@@ -190,20 +240,55 @@ def auto_placement(considered_gates=GLOBAL_ALL_BASIC_GATES_LIST, considered_swit
     return visual_gates
 
 considered_gates=[not1,not2]
-visual_gates = auto_placement(considered_gates=considered_gates)
+GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
 
 # Main game loop
-running = True
+running:bool = True
+selected_gate:VisualGate = None
+selected_pin:VisualPin = None
+current_connetion:VisualConnection = None
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            for gate in GLOBAL_visual_gates:
+                selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#il check sui pin ha la precedenza
+                if(selected_pin):
+                    break
+                if gate.visual_gate_contains_point(mouse_x, mouse_y):
+                    gate.visual_gate_start_drag(mouse_x, mouse_y)
+                    selected_gate = gate
+                    break
+
+            '''
+            start_coo, end_coo
+            '''
+            
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if selected_pin:
+                pass
+            if selected_gate:
+                selected_gate.visual_gate_end_drag()
+                selected_gate = None
+
+        elif event.type == pygame.MOUSEMOTION:
+            if selected_pin:
+                pass
+            if selected_gate:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                selected_gate.visual_gate_update_position(mouse_x, mouse_y)
     
     screen.fill(WHITE)
     
     # Draw all gates
-    for visual_gate in visual_gates:
+    for visual_gate in GLOBAL_visual_gates:
         visual_gate.draw(screen)
+
+    for connection in GLOBAL_visual_connections:
+        connection.draw(screen) 
     
     pygame.display.flip()
 
