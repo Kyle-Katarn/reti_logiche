@@ -13,6 +13,7 @@ RED = (255, 0, 0)
 LIGHTBLUE = (173, 216, 230)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
+GREEN = (0, 200, 0)
 
 GLOBAL_visual_gates:list["VisualGate"] = []
 GLOBAL_visual_connections:list["VisualConnection"] = []
@@ -61,7 +62,7 @@ class VisualConnection:
 
 
 class VisualPin:
-    CONST_hitbox_scaling:int = 15
+    CONST_hitbox_scaling:int = 4
     def __init__(self, visual_gate:"VisualGate", offset_x:int, offset_y:int, rad:int, type:str):
         self.type:str = type
         self.visual_gate:"VisualGate" = visual_gate
@@ -95,6 +96,7 @@ class VisualGate:
         self.gate = gate
         self.x = x 
         self.y = y
+        self.color = LIGHTBLUE
         self.width = 100
         # Height based on max between inputs and outputs
         max_pins = max(gate.number_of_inputs, gate.number_of_outputs)
@@ -148,11 +150,14 @@ class VisualGate:
                 selected_pin = pin
                 break
         return selected_pin
-        
+    
+    #*ELIMINAZIONE
+    def delete_internal_logic_gate(self):
+        print("DOES NOTHING, THIS SHOULD REMOVE LOGIC GATE FROM SIM")
 
     def draw(self, screen):
         # Draw gate body
-        pygame.draw.rect(screen, LIGHTBLUE, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
         
         # Draw gate name
         font = pygame.font.Font(None, 24)
@@ -272,28 +277,46 @@ def auto_placement(considered_gates=GLOBAL_ALL_BASIC_GATES_LIST, considered_swit
 considered_gates=[not1,not2]
 GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
 
+
 # Main game loop
 running:bool = True
+#gestione spostamento gate
 selected_gate:VisualGate = None
+#gestione connessioni pin
 selected_pin:VisualPin = None
 is_first_pin_already_selected = False
 first_pin_type = None
-was_mouse_button_up:bool = True#*or it will keep selecting the same pin while the mouse button is down
 current_connetion:VisualConnection = None
+#gestione azioni (cancellazione, copia, incolla) su oggetto
+gates_chosen_for_action_set:set[VisualGate] = set()
+are_gates_chosen_for_action_being_dragged:bool = False
 
 
 while running:
+    keys_pressed = pygame.key.get_pressed()#premute in un dato frame, dura N frame
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            for gate in GLOBAL_visual_gates: #*GESTIONE CONNESSIONE (hai premuto su un pin)
-                selected_pin:VisualPin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#il check sui pin ha la precedenza
-                if(selected_pin and was_mouse_button_up == True):
+            #L'evento pygame.MOUSEBUTTONDOWN si attiva solo per un singolo frame quindi il for è chiamato 1 sola volta per pressione
+            selected_pin = None
+            selected_gate = None
+            for gate in GLOBAL_visual_gates: #pin sono figli dei gate
+                selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)
+                if(selected_pin):#*GESTIONE CONNESSIONE (hai premuto su un pin)
+                    break#check dei pin ha la precedenza
+                if not selected_gate and gate.visual_gate_contains_point(mouse_x, mouse_y): #*GESTIONE SPOSTAMENTO GATES
+                    selected_gate = gate
+
+
+            keys = pygame.key.get_pressed()#serve perchè CTRL deve stare attivo per più frame
+            if not keys[pygame.K_LCTRL] and not keys[pygame.K_RCTRL]: #*CTRL non sta vendendo Premuto
+                if(selected_pin): #was_mouse_button_up non è necessario, perchè BUTTONDOWN è attivo per un solo frame
                     if(not is_first_pin_already_selected):#* nessun pin già selezionato
-                        print("nessun pin gia' selezionato")
+                        print("PRIMO pin selezionato con successo")
                         current_connetion:VisualConnection = VisualConnection()
                         first_pin_type = selected_pin.type
                         current_connetion.set_pin(selected_pin)
@@ -309,42 +332,77 @@ while running:
                             current_connetion = None #reset
                             is_first_pin_already_selected = False #reset
                             first_pin_type = None #reset
-                        
-                    #print(f"start_pin: {selected_pin} of {gate.gate.name}" )
-                    #print(f"current_connetion.start_pin: {current_connetion.start_pin}")
 
-                else: #*(hai premuto sul vuoto o su un gate)
-                    pass
+                else:#hai premuto sul vuoto o su un gate
+                    print("hai premuto sul vuoto o su un gate")
+                    current_connetion = None #reset
+                    is_first_pin_already_selected = False #reset
+                    first_pin_type = None #reset
+                
+                if(selected_gate):#GESTIONE SPOSTAMENTO GATE
+                    #print(f"{mouse_x}, {mouse_y}")
+                    selected_gate.visual_gate_start_drag(mouse_x, mouse_y)
 
-                if selected_pin == None and gate.visual_gate_contains_point(mouse_x, mouse_y): #*GESTIONE SPOSTAMENTO GATES
-                    gate.visual_gate_start_drag(mouse_x, mouse_y)
-                    selected_gate = gate
-                    break
+            else:
+                #print("CTRL STA VENENDO PREMUTO")
+                current_connetion = None #reset
+                is_first_pin_already_selected = False #reset
+                first_pin_type = None #reset
+                if(selected_gate):
+                    print("CTRL click su un gate")
+                    if(selected_gate in gates_chosen_for_action_set):
+                        gates_chosen_for_action_set.remove(selected_gate)
+                        selected_gate.color = LIGHTBLUE
+                    else:
+                        gates_chosen_for_action_set.add(selected_gate)
+                        selected_gate.color = GREEN
+                else:
+                    print("CTRL click sul vuoto")
+                    for vg in gates_chosen_for_action_set:
+                        vg.color = LIGHTBLUE
+                    gates_chosen_for_action_set.clear()
 
-            was_mouse_button_up = False #*in ogni caso, fuori dal for
 
-            if(not selected_pin):
-                if(was_mouse_button_up):
-                        print("hai premuto sul vuoto o su un gate")
-                        current_connetion = None #reset
-                        is_first_pin_already_selected = False #reset
-                        first_pin_type = None #reset
-
-            if(was_mouse_button_up):
+            if(False):
                 print("STATUS:")
                 print(f"selected_pin: {selected_pin}")
                 print(f"is_first_pin_already_selected: {is_first_pin_already_selected}")
                 print(f"first_pin_type: {first_pin_type}")
-                print(f"was_mouse_button_up: {was_mouse_button_up}")
                 print(f"current_connetion: {current_connetion}")
                 print("")
             
         elif event.type == pygame.MOUSEBUTTONUP:
+            print("mouse button up")
             if selected_gate:#*GESTIONE SPOSTAMENTO GATES
                 selected_gate.visual_gate_end_drag()
                 selected_gate = None
 
-            was_mouse_button_up = True
+        elif keys_pressed[pygame.K_m]:#* SPOSTAMENTO GATE in gates_chosen_for_action_set
+            print("K_m")
+            are_gates_chosen_for_action_being_dragged = not are_gates_chosen_for_action_being_dragged 
+            for vg in gates_chosen_for_action_set:
+                if(are_gates_chosen_for_action_being_dragged):
+                    vg.visual_gate_start_drag(mouse_x,mouse_y)
+                else:
+                    vg.visual_gate_end_drag()
+
+        elif keys_pressed[pygame.K_x]:
+            for vg in gates_chosen_for_action_set:
+                GLOBAL_visual_gates.remove(vg)
+                vg.delete_internal_logic_gate()
+
+        elif keys_pressed[pygame.K_c]:
+            print("K_c")
+            import copy
+            copied_gates:set[VisualGate] = copy.deepcopy(gates_chosen_for_action_set)
+            for vc in gates_chosen_for_action_set:
+                vc.color = LIGHTBLUE
+            gates_chosen_for_action_set.clear()
+            gates_chosen_for_action_set.update(copied_gates)
+            for vc in gates_chosen_for_action_set:
+                vc.x+=10
+                vc.y+=10
+            GLOBAL_visual_gates.extend(copied_gates)
 
         elif event.type == pygame.MOUSEMOTION:
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -355,8 +413,12 @@ while running:
                 else:
                     current_connetion.set_coordinates(start=(mouse_x,mouse_y))
             
-            if selected_gate:#*GESTIONE SPOSTAMENTO GATES
+            if selected_gate:#*GESTIONE SPOSTAMENTO selected_gate
                 selected_gate.visual_gate_update_position(mouse_x, mouse_y)
+            if are_gates_chosen_for_action_being_dragged:
+                for vg in gates_chosen_for_action_set:
+                    vg.visual_gate_update_position(mouse_x,mouse_y)
+
     
     screen.fill(WHITE)
     
