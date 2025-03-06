@@ -12,69 +12,88 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 LIGHTBLUE = (173, 216, 230)
 WHITE = (255, 255, 255)
+YELLOW = (255, 255, 0)
 
 GLOBAL_visual_gates:list["VisualGate"] = []
 GLOBAL_visual_connections:list["VisualConnection"] = []
 
 class VisualConnection:
-    def __init__(self, start_gate_tup: tuple["VisualGate",int]=None, end_gate_tup: tuple["VisualGate",int]=None):
-        self.start_gate_tup:tuple["VisualGate",int] = start_gate_tup
-        self.end_gate_tup:tuple["VisualGate",int] = end_gate_tup
+    def __init__(self):
+        self.color = YELLOW
+        self.start_pin:VisualPin = None
+        self.end_pin:VisualPin = None
         self.start_x =0
         self.start_y =0
         self.end_x =0
         self.end_y =0
-        self.update_connection()
 
-    def set_end_coo(self, end_x, end_y):
-        self.end_x = end_x
-        self.end_y = end_y
+    def set_coordinates(self, start = None, end = None):
+        if(start != None):
+            self.start_x, self.start_y = start
+        if(end != None):
+            self.end_x, self.end_y = end
 
-    def update_connection(self):
-        self.start_gate:VisualGate = self.start_gate_tup[0]
-        self.start_gate_ix:int = self.start_gate_tup[1]
-        self.end_gate: VisualGate = self.end_gate_tup[0]
-        self.end_gate_ix:int = self.end_gate_tup[1]
-        #start_gate output pin coo
-        self.start_x = self.start_gate.x + self.start_gate.width
-        start_y_segment:int = self.start_gate.height//(self.start_gate.gate.number_of_outputs+1)
-        self.start_y = self.start_gate.y + start_y_segment*(self.start_gate_ix+1)
-        #end_gate input pin coo
-        if(self.end_gate_tup == None):
-            self.end_x = self.end_gate.x
-            end_y_segment:int = self.end_gate.height//(self.end_gate.gate.number_of_inputs+1)
-            self.end_y = self.end_gate.y + end_y_segment*(self.end_gate_ix+1)
+    def set_pins(self, start_pin:"VisualPin" = None, end_pin:"VisualPin" = None):
+        self.start_pin = start_pin
+        self.end_pin = end_pin
+
+    def set_pin(self, pin:"VisualPin"):
+        if(pin.type == "in"):
+            self.start_pin = pin
+        else:
+            self.end_pin = pin
+
+    def auto_update_connection(self):
+        if(self.start_pin == None and self.end_pin == None):
+            raise Exception(f"@VISUAL ERROR: self.start_pin={self.start_pin} or self.end_pin={self.end_pin} is NONE")
+        if(self.start_pin != None):
+            self.start_x, self.start_y = self.start_pin.get_coordinates()
+        if(self.end_pin != None):
+            self.end_x, self.end_y= self.end_pin.get_coordinates()
+        
         
     def draw(self, screen):
-        self.update_connection()
-        color = BLACK
-        if(self.start_gate.gate.get_output_signal_value(self.start_gate_ix)):
-            color = RED
-        pygame.draw.line(screen, color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
+        if(self.start_pin != None and self.end_pin != None):
+            self.auto_update_connection()
+        if(self.start_pin):
+            color = self.start_pin.color
+        pygame.draw.line(screen, self.color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
 
 
 class VisualPin:
-    CONST_hitbox_scaling:int = 2
-    def __init__(self, x:int, y:int, rad:int, type:str):
+    CONST_hitbox_scaling:int = 15
+    def __init__(self, visual_gate:"VisualGate", offset_x:int, offset_y:int, rad:int, type:str):
         self.type:str = type
-        self.center_x = x
-        self.center_y = y
+        self.visual_gate:"VisualGate" = visual_gate
+        #^^Avere una reference serve a evitare di dover riassegnare manualmente le coordinate ogni volta che sposto la VisualGate, forse era meglio avere una ref al padre? si era meglio
+        self.offset_x = offset_x
+        self.offset_y = offset_y
         self.radious = rad
+        self.color = BLACK
 
     def visual_pin_conains_point(self, px: int, py: int):
-        Dx:int = px-self.center_x
-        Dy:int = py-self.center_y
+        #print((self.visual_gate.x+self.offset_x))
+        Dx:int = px-(self.visual_gate.x+self.offset_x)
+        Dy:int = py-(self.visual_gate.y+self.offset_y)
+        #print(px-self.visual_gate.x+self.offset_x)
+        #print(f"Dx {Dx} Dy {Dy}, mousex {px}, mousey: {py}| pinX: {self.visual_gate.x+self.offset_x}, pinY: {self.visual_gate.x+self.offset_y}")
         return sqrt(Dx**2 + Dy**2) <= self.radious * self.CONST_hitbox_scaling
 
     def draw(self, pin_color):
-        pygame.draw.circle(screen, pin_color, (self.center_x, self.center_y), self.radious)
+        pygame.draw.circle(screen, pin_color, (self.visual_gate.x+self.offset_x, self.visual_gate.y+self.offset_y), self.radious)
+
+    def get_coordinates(self):
+        return (self.visual_gate.x+self.offset_x, self.visual_gate.y+self.offset_y)
+
+
 
 class VisualGate:
     def __init__(self, gate: BasicGate, x: int, y: int):
         self.visual_connections: list[VisualConnection] = []
-        self.visual_pins: list[VisualPin] = []
+        self.visual_input_pins: list[VisualPin] = []
+        self.visual_output_pins: list[VisualPin] = []
         self.gate = gate
-        self.x = x
+        self.x = x 
         self.y = y
         self.width = 100
         # Height based on max between inputs and outputs
@@ -84,6 +103,21 @@ class VisualGate:
         self.is_dragging = False
         self.drag_offset_x = 0
         self.drag_offset_y = 0
+
+        #* ISTANZIA CLASSI PIN / input
+        if self.gate.number_of_inputs > 0:
+            spacing = self.height // (self.gate.number_of_inputs + 1)
+            for i in range(self.gate.number_of_inputs):
+                y_offset = spacing * (i + 1)
+                visual_pin:VisualPin = VisualPin(self, 0, y_offset, self.pin_radius, "in")#!maybe coo obj?
+                self.visual_input_pins.append(visual_pin)
+                
+        #* / output
+        spacing = self.height // (self.gate.number_of_outputs + 1)
+        for i in range(self.gate.number_of_outputs):
+            y_offset = spacing * (i + 1)
+            visual_pin:VisualPin = VisualPin(self, self.width, y_offset, self.pin_radius, "out")
+            self.visual_output_pins.append(visual_pin)
 
     #*Gestione SPOSTAMENTO RETTANGOLO
     def visual_gate_contains_point(self, x: int, y: int) -> bool:
@@ -106,7 +140,10 @@ class VisualGate:
     #*Gestione CREAZIONE COLLEGAMENTI
     def check_if_a_visual_pin_is_cicked(self, x: int, y: int):
         selected_pin:VisualPin = None
-        for pin in self.visual_pins:
+        all_pins = []
+        all_pins.extend(self.visual_input_pins)
+        all_pins.extend(self.visual_output_pins)
+        for pin in all_pins:
             if pin.visual_pin_conains_point(x,y):
                 selected_pin = pin
                 break
@@ -122,35 +159,20 @@ class VisualGate:
         text = font.render(self.gate.name, True, BLACK)
         text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
         screen.blit(text, text_rect)
-
-        #* Draw input pins
-        if self.gate.number_of_inputs > 0:
-            spacing = self.height // (self.gate.number_of_inputs + 1)
-            for i in range(self.gate.number_of_inputs):
-                pin_color = RED if self.gate.get_input_signal_value(i) else BLACK
-                y_pos = self.y + spacing * (i + 1)
-                visual_pin:VisualPin = VisualPin(self.x, y_pos, self.pin_radius, "in")
-                self.visual_pins.append(visual_pin)
-                visual_pin.draw(pin_color)
-
-        #* Draw output pins
-        spacing = self.height // (self.gate.number_of_outputs + 1)
-        for i in range(self.gate.number_of_outputs):
-            pin_color = RED if self.gate.get_output_signal_value(i) else BLACK
-            y_pos = self.y + spacing * (i + 1)
-            visual_pin:VisualPin = VisualPin(self.x + self.width, y_pos, self.pin_radius, "out")
-            self.visual_pins.append(visual_pin)
-            visual_pin.draw(pin_color)
             
-        # Draw connections
-        for connection in self.visual_connections:
-            connection.draw(screen)
+        # Draw PINS
+        for input_pin_ix in range(self.gate.number_of_inputs):
+            pin_color = RED if self.gate.get_input_signal_value(input_pin_ix) else BLACK
+            self.visual_input_pins[input_pin_ix].draw(pin_color)
+        for output_pin_ix in range(self.gate.number_of_outputs):
+            pin_color = RED if self.gate.get_output_signal_value(output_pin_ix) else BLACK
+            self.visual_output_pins[output_pin_ix].draw(pin_color)
             
-        
+    '''  
     def add_connection(self, end_gate_tup:tuple["VisualGate",int], starting_pin_ix:int):
         connection = VisualConnection((self, starting_pin_ix), end_gate_tup)
         self.visual_connections.append(connection)
-
+    '''
 
 def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_switches:list[LogicClass] = GLOBAL_ALL_SWITCHES_LIST):
     dict_gate_to_BFS_level:dict[LogicClass,int] = dict()
@@ -159,7 +181,7 @@ def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GAT
     starting_gates:list[LogicClass] = []
     starting_gates.extend(considered_switches)
     for g in considered_gates:
-        print("gate: "+ str(g) + str(g.get_all_input_gates()))
+        #print("gate: "+ str(g) + str(g.get_all_input_gates()))
         if(len(g.get_all_input_gates()) == 0):
             considered_gates.append(g)
     get_gates_level_BFS_helper(starting_gates,considered_gates,visited_gates_set, dict_gate_to_BFS_level)#se non ci sono cicli basta questo
@@ -223,12 +245,20 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
         visual_gates.append(visual_child_gate)
 
     for father_gate in lista_obj:
+        father_gate_child_dict:dict[int,tuple[AbstractGate,int]] = father_gate.get_child_gates_dict()
         for father_gate_output_ix in range(father_gate.number_of_outputs):
-            child_gates_of_output_ix:set[tuple[AbstractGate,int]] = father_gate.get_child_gates_dict()[father_gate_output_ix]
+            child_gates_of_output_ix:set[tuple[AbstractGate,int]] = father_gate_child_dict[father_gate_output_ix]
             for child_gate, child_gate_input_ix in child_gates_of_output_ix:
                 visual_father_gate:VisualGate = dict_logic_to_visual_gates[father_gate]
                 visual_child_gate:VisualGate = dict_logic_to_visual_gates[child_gate]
-                visual_father_gate.add_connection((visual_child_gate,child_gate_input_ix), father_gate_output_ix)
+                #visual_father_gate.add_connection((visual_child_gate,child_gate_input_ix), father_gate_output_ix)
+                #print(f"father gate childer: {father_gate.get_all_child_gates()}")
+                #print(f"visual_father_gate.visual_output_pins: {visual_father_gate.visual_output_pins}")#!non creai i pin
+                start_pin:VisualPin = visual_father_gate.visual_output_pins[father_gate_output_ix]
+                end_pin:VisualPin = visual_child_gate.visual_input_pins[child_gate_input_ix]
+                new_connection:VisualConnection = VisualConnection()
+                new_connection.set_pins(start_pin,end_pin)
+                GLOBAL_visual_connections.append(new_connection)
     return visual_gates
         
 
@@ -246,39 +276,86 @@ GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
 running:bool = True
 selected_gate:VisualGate = None
 selected_pin:VisualPin = None
+is_first_pin_already_selected = False
+first_pin_type = None
+was_mouse_button_up:bool = True#*or it will keep selecting the same pin while the mouse button is down
 current_connetion:VisualConnection = None
+
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            for gate in GLOBAL_visual_gates:
-                selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#il check sui pin ha la precedenza
-                if(selected_pin):
-                    break
-                if gate.visual_gate_contains_point(mouse_x, mouse_y):
+            for gate in GLOBAL_visual_gates: #*GESTIONE CONNESSIONE (hai premuto su un pin)
+                selected_pin:VisualPin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#il check sui pin ha la precedenza
+                if(selected_pin and was_mouse_button_up == True):
+                    if(not is_first_pin_already_selected):#* nessun pin già selezionato
+                        print("nessun pin gia' selezionato")
+                        current_connetion:VisualConnection = VisualConnection()
+                        first_pin_type = selected_pin.type
+                        current_connetion.set_pin(selected_pin)
+                        is_first_pin_already_selected = True
+
+                    else:#* 1^pin è già stato selezionato
+                        if(selected_pin.type == first_pin_type):
+                            print("WARNING, you can't connect 2 inputs or 2 outputs")
+                        else:
+                            print("secondo pin selezionato con successo")
+                            current_connetion.set_pin(selected_pin)
+                            GLOBAL_visual_connections.append(current_connetion)
+                            current_connetion = None #reset
+                            is_first_pin_already_selected = False #reset
+                            first_pin_type = None #reset
+                        
+                    #print(f"start_pin: {selected_pin} of {gate.gate.name}" )
+                    #print(f"current_connetion.start_pin: {current_connetion.start_pin}")
+
+                else: #*(hai premuto sul vuoto o su un gate)
+                    pass
+
+                if selected_pin == None and gate.visual_gate_contains_point(mouse_x, mouse_y): #*GESTIONE SPOSTAMENTO GATES
                     gate.visual_gate_start_drag(mouse_x, mouse_y)
                     selected_gate = gate
                     break
 
-            '''
-            start_coo, end_coo
-            '''
+            was_mouse_button_up = False #*in ogni caso, fuori dal for
+
+            if(not selected_pin):
+                if(was_mouse_button_up):
+                        print("hai premuto sul vuoto o su un gate")
+                        current_connetion = None #reset
+                        is_first_pin_already_selected = False #reset
+                        first_pin_type = None #reset
+
+            if(was_mouse_button_up):
+                print("STATUS:")
+                print(f"selected_pin: {selected_pin}")
+                print(f"is_first_pin_already_selected: {is_first_pin_already_selected}")
+                print(f"first_pin_type: {first_pin_type}")
+                print(f"was_mouse_button_up: {was_mouse_button_up}")
+                print(f"current_connetion: {current_connetion}")
+                print("")
             
         elif event.type == pygame.MOUSEBUTTONUP:
-            if selected_pin:
-                pass
-            if selected_gate:
+            if selected_gate:#*GESTIONE SPOSTAMENTO GATES
                 selected_gate.visual_gate_end_drag()
                 selected_gate = None
 
+            was_mouse_button_up = True
+
         elif event.type == pygame.MOUSEMOTION:
-            if selected_pin:
-                pass
-            if selected_gate:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if(current_connetion != None): #*GESTIONE CONNESSIONE
+                current_connetion.auto_update_connection()
+                if(first_pin_type == "in"):
+                    current_connetion.set_coordinates(end=(mouse_x,mouse_y))
+                else:
+                    current_connetion.set_coordinates(start=(mouse_x,mouse_y))
+            
+            if selected_gate:#*GESTIONE SPOSTAMENTO GATES
                 selected_gate.visual_gate_update_position(mouse_x, mouse_y)
     
     screen.fill(WHITE)
@@ -289,6 +366,9 @@ while running:
 
     for connection in GLOBAL_visual_connections:
         connection.draw(screen) 
+
+    if(current_connetion != None):
+        current_connetion.draw(screen=screen)
     
     pygame.display.flip()
 
