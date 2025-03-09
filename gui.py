@@ -22,6 +22,7 @@ GLOBAL_visual_gates:list["VisualGate"] = []
 class VisualConnection:
     def __init__(self):
         self.color = YELLOW
+        self.is_self_in_connections_chosen_for_action_set:bool = False#Needed to determine the color
         self.start_pin:VisualPin = None
         self.end_pin:VisualPin = None
         self.start_x =0
@@ -44,7 +45,7 @@ class VisualConnection:
         self.end_pin = end_pin
 
     def set_pin(self, pin:"VisualPin"):
-        if(pin.type == "in"):
+        if(pin.type == "out"):#todo FIX errore uscita---->entrata
             self.start_pin = pin
         else:
             self.end_pin = pin
@@ -60,13 +61,17 @@ class VisualConnection:
     def draw(self, screen):
         if(self.start_pin and self.end_pin):
             self.is_connection_finalized = True
-        if(self.is_connection_finalized and (not self.start_pin.visual_gate in GLOBAL_visual_gates)):#!errore
-            print("in")
+        if(self.is_connection_finalized and (not self.start_pin.visual_gate in GLOBAL_visual_gates)):#!MOLTO GOOFY ma non so come rimuovere la classe in altro modo
             self.remove_self()
-        if(self.start_pin != None and self.end_pin != None):
+        if(self.is_connection_finalized):
             self.auto_update_connection()
-        if(self.start_pin and self.color != GREEN):
-            self.color = self.start_pin.color
+        if(self.start_pin):
+            if(self.is_self_in_connections_chosen_for_action_set):
+                self.color = GREEN
+            elif(not self.is_connection_finalized):
+                self.color = YELLOW
+            else:
+                self.color = self.start_pin.color
             #print(f"self.start_pin.color: {self.start_pin.color}")
         pygame.draw.line(screen, self.color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
 
@@ -106,7 +111,7 @@ class VisualConnection:
 
 
 class VisualPin:
-    CONST_hitbox_scaling:int = 4
+    CONST_hitbox_scaling:int = 2
     def __init__(self, visual_gate:"VisualGate", logic_gate_index:int, offset_x:int, offset_y:int, rad:int, type:str):
         self.type:str = type
         self.logic_gate_index:int = logic_gate_index
@@ -122,8 +127,12 @@ class VisualPin:
         Dy:int = py-(self.visual_gate.y+self.offset_y)
         return sqrt(Dx**2 + Dy**2) <= self.radious * self.CONST_hitbox_scaling
 
-    def draw(self, pin_color):
-        pygame.draw.circle(screen, pin_color, (self.visual_gate.x+self.offset_x, self.visual_gate.y+self.offset_y), self.radious)
+    def draw(self):
+        if(self.type == "in"):
+            self.color = RED if self.visual_gate.gate.get_input_signal_value(self.logic_gate_index) else BLACK
+        else:
+            self.color = RED if self.visual_gate.gate.get_output_signal_value(self.logic_gate_index) else BLACK
+        pygame.draw.circle(screen, self.color, (self.visual_gate.x+self.offset_x, self.visual_gate.y+self.offset_y), self.radious)
 
     def get_coordinates(self):
         return (self.visual_gate.x+self.offset_x, self.visual_gate.y+self.offset_y)
@@ -217,13 +226,11 @@ class VisualGate:
         text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
         screen.blit(text, text_rect)
             
-        # Draw PINS
+        #* Draw PINS
         for input_pin_ix in range(self.gate.number_of_inputs):
-            pin_color = RED if self.gate.get_input_signal_value(input_pin_ix) else BLACK
-            self.visual_input_pins[input_pin_ix].draw(pin_color)
+            self.visual_input_pins[input_pin_ix].draw()
         for output_pin_ix in range(self.gate.number_of_outputs):
-            pin_color = RED if self.gate.get_output_signal_value(output_pin_ix) else BLACK
-            self.visual_output_pins[output_pin_ix].draw(pin_color)
+            self.visual_output_pins[output_pin_ix].draw()
             
 
 def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_switches:list[LogicClass] = GLOBAL_ALL_SWITCHES_LIST):
@@ -272,12 +279,12 @@ def get_gates_level_BFS_helper(starting_gates:list[LogicClass], considered_gates
     return dict_gate_to_BFS_level
 
 
+dict_logic_to_visual_gates:dict[LogicClass, VisualGate] = {}#useful for debug
 def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered_gates: list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_swiches = GLOBAL_ALL_SWITCHES_LIST):
     #todo 1 -> tutti i gate puntati da 1 -> 2. ->
     
     visual_gates:set[VisualGate] = []
     x, y = -100, 50
-    dict_logic_to_visual_gates:dict[LogicClass, VisualGate] = {}
     dict_BFS_level_to_next_y_coo:dict[int, int] = {}
 
     lista_obj:list[LogicClass] = []
@@ -368,9 +375,6 @@ while running:
             for gate in GLOBAL_visual_gates: 
                 selected_connection = gate.check_if_a_visual_connection_is_cicked(mouse_x, mouse_y)#*HAI PREMUTO SU UNA CONNESSIONE
                 if((keys_pressed[pygame.K_LCTRL] or keys_pressed[pygame.K_RCTRL]) and selected_connection):
-                    connections_chosen_for_action_set.add(selected_connection)
-                    selected_connection.color = GREEN
-                    print("connection clicked")
                     break
 
                 selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#*HAI PREMUTO SU UN PIN
@@ -384,14 +388,14 @@ while running:
 
             if not keys_pressed[pygame.K_LCTRL] and not keys_pressed[pygame.K_RCTRL]: #*CTRL non sta vendendo Premuto
                 if(selected_pin): #was_mouse_button_up non è necessario, perchè BUTTONDOWN è attivo per un solo frame
-                    if(not is_first_pin_already_selected):#* nessun pin già selezionato
+                    if(not is_first_pin_already_selected):#* SELEZIONE 1^PIN
                         print("PRIMO pin selezionato con successo")
                         connection_being_created:VisualConnection = VisualConnection()
                         first_pin_type = selected_pin.type
                         connection_being_created.set_pin(selected_pin)
                         is_first_pin_already_selected = True
 
-                    else:#* 1^pin è già stato selezionato; GESTIONE 2^PIN
+                    else:#* 1^pin è già stato selezionato; SELEZIONE 2^PIN
                         if(selected_pin.type == first_pin_type):
                             print("WARNING, you can't connect 2 inputs or 2 outputs")
                         else:
@@ -410,29 +414,39 @@ while running:
                     is_first_pin_already_selected = False #reset
                     first_pin_type = None #reset
                 
-                if(selected_gate):#GESTIONE SPOSTAMENTO GATE
+                if(selected_gate):#*START SPOSTAMENTO 1 GATE
                     #print(f"{mouse_x}, {mouse_y}")
                     selected_gate.visual_gate_start_drag(mouse_x, mouse_y)
 
-            else:#* GESTIONE SELEZIONE E DESELEZIONEDI GATES E CONNESSIONI
+            else:#* SELEZIONE E DESELEZIONE DI GATES E CONNESSIONI
                 #print("CTRL STA VENENDO PREMUTO")
                 connection_being_created = None #reset
                 is_first_pin_already_selected = False #reset
                 first_pin_type = None #reset
-                if(selected_gate):
-                    print("CTRL click su un gate")
-                    if(selected_gate in gates_chosen_for_action_set):
-                        gates_chosen_for_action_set.remove(selected_gate)
-                        selected_gate.color = LIGHTBLUE
+                if(selected_connection):
+                    print("CTRL click su una connessione")
+                    if(not selected_connection in connections_chosen_for_action_set):
+                        connections_chosen_for_action_set.add(selected_connection)
+                        selected_connection.is_self_in_connections_chosen_for_action_set = True
                     else:
+                        connections_chosen_for_action_set.remove(selected_connection)
+                        selected_connection.is_self_in_connections_chosen_for_action_set = False
+                elif(selected_gate):
+                    print("CTRL click su un gate")
+                    if(not selected_gate in gates_chosen_for_action_set):
                         gates_chosen_for_action_set.add(selected_gate)
                         selected_gate.color = GREEN
+                    else:
+                        gates_chosen_for_action_set.remove(selected_gate)
+                        selected_gate.color = LIGHTBLUE
                 else:
                     print("CTRL click sul vuoto")
                     for vg in gates_chosen_for_action_set:
                         vg.color = LIGHTBLUE
                     gates_chosen_for_action_set.clear()
-                    #!serve una cosa centralizzata per gates e connections?
+                    for vc in connections_chosen_for_action_set:
+                        vc.is_self_in_connections_chosen_for_action_set = False
+                    connections_chosen_for_action_set.clear()
 
 
             if(False):
@@ -445,20 +459,23 @@ while running:
             
         elif event.type == pygame.MOUSEBUTTONUP:
             print("mouse button up")
-            if selected_gate:#*GESTIONE SPOSTAMENTO GATES
+            if selected_gate:#*END SPOSTAMENTO 1 GATE
                 selected_gate.visual_gate_end_drag()
                 selected_gate = None
 
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:  # * SPOSTAMENTO GATE in gates_chosen_for_action_set
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_m:  # *START/END SPOSTAMENTO N GATES in gates_chosen_for_action_set
             print("K_m")
             are_gates_chosen_for_action_being_dragged = not are_gates_chosen_for_action_being_dragged 
-            for vg in gates_chosen_for_action_set:
+            for vg in gates_chosen_for_action_set.copy():
                 if(are_gates_chosen_for_action_being_dragged):
                     vg.visual_gate_start_drag(mouse_x,mouse_y)
                 else:
                     vg.visual_gate_end_drag()
+                    for vg in gates_chosen_for_action_set:#reset
+                        vg.color = LIGHTBLUE
+                    gates_chosen_for_action_set.clear()
 
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_x:  # * CANCELLAZIONE
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_x:  #* CANCELLAZIONE GATES, CONNESSIONI
             for vg in gates_chosen_for_action_set:
                 GLOBAL_visual_gates.remove(vg)
                 vg.delete_internal_logic_gate()
@@ -485,16 +502,16 @@ while running:
 
         elif event.type == pygame.MOUSEMOTION:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            if(connection_being_created != None): #*GESTIONE CONNESSIONE
+            if(connection_being_created != None): #*SPOSTAMENTO MOUSE connection_being_created
                 connection_being_created.auto_update_connection()
-                if(first_pin_type == "in"):
+                if(first_pin_type == "out"):#spostalo interno a classe pin?
                     connection_being_created.set_coordinates(end=(mouse_x,mouse_y))
                 else:
                     connection_being_created.set_coordinates(start=(mouse_x,mouse_y))
             
-            if selected_gate:#*GESTIONE SPOSTAMENTO selected_gate
+            if selected_gate:#* SPOSTAMENTO MOUSE 1 GATE
                 selected_gate.visual_gate_update_position(mouse_x, mouse_y)
-            if are_gates_chosen_for_action_being_dragged:
+            if are_gates_chosen_for_action_being_dragged:#*SPOSTAMENTO MOUSE N GATES
                 for vg in gates_chosen_for_action_set:
                     vg.visual_gate_update_position(mouse_x,mouse_y)
 
@@ -509,7 +526,6 @@ while running:
 
     for visual_gate in GLOBAL_visual_gates.copy():#I need a separate for beacuse connections must be on top of gates
         for vc in visual_gate.visual_connections.copy():
-            #print(f"{vc.start_pin.visual_gate.gate.name} | {vc.end_pin.visual_gate.gate.name}")
             vc.draw(screen)  
 
     '''#!old
@@ -523,3 +539,29 @@ while running:
     pygame.display.flip()
 
 pygame.quit()
+
+def connection_debugger(logic_gate:LogicClass):
+    input_visual_gate:VisualGate = dict_logic_to_visual_gates[logic_gate]
+    visual_connections_set:set[VisualConnection] = input_visual_gate.visual_connections
+
+    print("Input pins:")
+    for ivp in visual_gate.visual_input_pins:
+        print(f"input pin {ivp}")
+
+    if(len(visual_connections_set) == 0):
+        print(f"NO connections point to {logic_gate.name}")
+    for vc in visual_connections_set:
+        start_pin:VisualPin = vc.start_pin
+        end_pin:VisualPin = vc.end_pin
+        print(f"start_pin father: {start_pin.visual_gate.gate} | start_pin_type: {start_pin.type} | start_pin_color: {start_pin.color}")
+        print(f"end_pin father: {end_pin.visual_gate.gate} | end_pin_type: {end_pin.type} | end_pin_color: {end_pin.color}")
+
+        output_visual_gate:VisualGate = start_pin.visual_gate
+        print("\n\nOutput VisualGate pins:")
+        for ovp in output_visual_gate.visual_output_pins:
+            print(f"output pin {ovp} | color: {ovp.color}")
+
+    
+
+
+connection_debugger(not2)#todo errore!!
