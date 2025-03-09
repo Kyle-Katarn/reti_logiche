@@ -1,4 +1,5 @@
 import pygame
+import gc
 from reti_logiche import *
 from math import sqrt
 
@@ -19,8 +20,7 @@ GLOBAL_visual_gates:list["VisualGate"] = []
 #GLOBAL_visual_connections:list["VisualConnection"] = []
 
 class VisualConnection:
-    def __init__(self, father_gate=None):
-        self.father_gate:VisualGate = father_gate
+    def __init__(self):
         self.color = YELLOW
         self.start_pin:VisualPin = None
         self.end_pin:VisualPin = None
@@ -29,7 +29,10 @@ class VisualConnection:
         self.end_x =0
         self.end_y =0
         self.hitbox_length = 5
-
+        self.is_connection_finalized:bool = False
+        #^^distingue il caso in cui ha un pin a null perchè non hai ancora selezionato il secondo con mouse
+        #dal caso in cui lo start_pin (assieme alla sua VisualGate madre) viene eliminato dall'utente -> la connection deve essere eliminata a catena 
+        #is_connection_finalized = TRUE, quando viene selezionato il 2^pin
     def set_coordinates(self, start = None, end = None):
         if(start != None):
             self.start_x, self.start_y = start
@@ -55,17 +58,32 @@ class VisualConnection:
             self.end_x, self.end_y= self.end_pin.get_coordinates()
         
     def draw(self, screen):
+        if(self.start_pin and self.end_pin):
+            self.is_connection_finalized = True
+        if(self.is_connection_finalized and (not self.start_pin.visual_gate in GLOBAL_visual_gates)):#!errore
+            print("in")
+            self.remove_self()
         if(self.start_pin != None and self.end_pin != None):
             self.auto_update_connection()
-        if(self.start_pin):
+        if(self.start_pin and self.color != GREEN):
             self.color = self.start_pin.color
+            #print(f"self.start_pin.color: {self.start_pin.color}")
         pygame.draw.line(screen, self.color, (self.start_x, self.start_y), (self.end_x, self.end_y), 2)
 
-    def delete_self(self):
-        self.father_gate.visual_connections.remove(self)
+    def remove_self(self):
+        print(f"gate: {self.get_end_pin_visual_gate().gate}")
+        self.get_end_pin_visual_gate().visual_connections.remove(self)
 
     def connect_logic_pins(self):
+        print("connect_logic_pins NON FA NULLA")
         pass#boh
+
+    def unconnect_logic_pins(self):
+        print("unconnect_logic_pins NON FA NULLA")
+        pass
+
+    def get_end_pin_visual_gate(self):
+        return self.end_pin.visual_gate
 
     def is_visual_connection_clicked(self, px: int, py: int):
         # Calculate the distance from the point to the line segment
@@ -164,7 +182,7 @@ class VisualGate:
             self.x = mouse_x - self.drag_offset_x
             self.y = mouse_y - self.drag_offset_y
 
-    #*Gestione CREAZIONE COLLEGAMENTI
+    #*Gestione SELEZIONE PIN (PIN)
     def check_if_a_visual_pin_is_cicked(self, x: int, y: int):
         selected_pin:VisualPin = None
         all_pins = []
@@ -175,6 +193,15 @@ class VisualGate:
                 selected_pin = pin
                 break
         return selected_pin
+    
+    #*Gestione SELEZIONE CONNESSIONE (CONNESSIONE)
+    def check_if_a_visual_connection_is_cicked(self, x: int, y: int):
+        selected_connection:VisualConnection = None
+        for connection in self.visual_connections:
+            if(connection.is_visual_connection_clicked(x,y)):
+                selected_connection = connection
+                break
+        return selected_connection
     
     #*ELIMINAZIONE
     def delete_internal_logic_gate(self):
@@ -205,10 +232,11 @@ def get_gates_level_BFS(considered_gates:list[LogicClass] = GLOBAL_ALL_BASIC_GAT
     visited_gates_set:set[LogicClass] = set() #x cicli
     starting_gates:list[LogicClass] = []
     starting_gates.extend(considered_switches)
+    #print(considered_gates)
     for g in considered_gates:
         #print("gate: "+ str(g) + str(g.get_all_input_gates()))
         if(len(g.get_all_input_gates()) == 0):
-            considered_gates.append(g)
+            starting_gates.append(g)
     get_gates_level_BFS_helper(starting_gates,considered_gates,visited_gates_set, dict_gate_to_BFS_level)#se non ci sono cicli basta questo
     starting_gates.clear()
 
@@ -283,7 +311,7 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
                 end_pin:VisualPin = visual_child_gate.visual_input_pins[child_gate_input_ix]
                 new_connection:VisualConnection = VisualConnection()
                 new_connection.set_pins(start_pin,end_pin)
-                visual_father_gate.visual_connections.add(new_connection)
+                visual_child_gate.visual_connections.add(new_connection)
                 #GLOBAL_visual_connections.append(new_connection) #! CHANGE
     return visual_gates
         
@@ -292,11 +320,16 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
 def auto_placement(considered_gates=GLOBAL_ALL_BASIC_GATES_LIST, considered_switches=GLOBAL_ALL_SWITCHES_LIST):
     gates_to_BFS_levels:dict[LogicClass,int] = get_gates_level_BFS(considered_gates=considered_gates, considered_switches=GLOBAL_ALL_SWITCHES_LIST)
     #print("gates_to_BFS_levels: "+ str(gates_to_BFS_levels))
+    print("ciao")
     visual_gates:list[VisualGate] = create_visual_gates(dict_gate_to_BFS_level=gates_to_BFS_levels, considered_gates = considered_gates)
     return visual_gates
 
+
+
 considered_gates=[not1,not2]
 GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
+
+
 
 
 # Main game loop
@@ -309,11 +342,14 @@ second_pin:VisualPin = None
 selected_pin:VisualPin = None
 is_first_pin_already_selected = False
 first_pin_type = None
-current_connetion:VisualConnection = None
+connection_being_created:VisualConnection = None
 #gestione azioni (cancellazione, copia, incolla) su oggetto
+#selected_gate
+selected_connection:VisualConnection = None
 gates_chosen_for_action_set:set[VisualGate] = set()
 are_gates_chosen_for_action_being_dragged:bool = False
 connections_chosen_for_action_set:set[VisualConnection] = set()
+
 
 
 
@@ -329,42 +365,48 @@ while running:
             #L'evento pygame.MOUSEBUTTONDOWN si attiva solo per un singolo frame quindi il for è chiamato 1 sola volta per pressione
             selected_pin = None
             selected_gate = None
-            for gate in GLOBAL_visual_gates: #pin sono figli dei gate
-                for connection in gate.visual_connections:
-                    if(connection.is_visual_connection_clicked(mouse_x,mouse_y) and (keys_pressed[pygame.K_LCTRL] or keys_pressed[pygame.K_RCTRL])):
-                        connection.color = GREEN
-                        connections_chosen_for_action_set.add(connection)
-                selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)
-                if(selected_pin):#*GESTIONE CONNESSIONE (hai premuto su un pin)
+            for gate in GLOBAL_visual_gates: 
+                selected_connection = gate.check_if_a_visual_connection_is_cicked(mouse_x, mouse_y)#*HAI PREMUTO SU UNA CONNESSIONE
+                if((keys_pressed[pygame.K_LCTRL] or keys_pressed[pygame.K_RCTRL]) and selected_connection):
+                    connections_chosen_for_action_set.add(selected_connection)
+                    selected_connection.color = GREEN
+                    print("connection clicked")
+                    break
+
+                selected_pin = gate.check_if_a_visual_pin_is_cicked(mouse_x, mouse_y)#*HAI PREMUTO SU UN PIN
+                if(selected_pin):
                     break#check dei pin ha la precedenza
-                if not selected_gate and gate.visual_gate_contains_point(mouse_x, mouse_y): #*GESTIONE SPOSTAMENTO GATES
+
+                if not selected_gate and gate.visual_gate_contains_point(mouse_x, mouse_y):#*HAI PREMUTO SU UN GATE
                     selected_gate = gate
+                    break
 
 
-            keys = pygame.key.get_pressed()#serve perchè CTRL deve stare attivo per più frame
             if not keys_pressed[pygame.K_LCTRL] and not keys_pressed[pygame.K_RCTRL]: #*CTRL non sta vendendo Premuto
                 if(selected_pin): #was_mouse_button_up non è necessario, perchè BUTTONDOWN è attivo per un solo frame
                     if(not is_first_pin_already_selected):#* nessun pin già selezionato
                         print("PRIMO pin selezionato con successo")
-                        current_connetion:VisualConnection = VisualConnection()
+                        connection_being_created:VisualConnection = VisualConnection()
                         first_pin_type = selected_pin.type
-                        current_connetion.set_pin(selected_pin)
+                        connection_being_created.set_pin(selected_pin)
                         is_first_pin_already_selected = True
 
-                    else:#* 1^pin è già stato selezionato
+                    else:#* 1^pin è già stato selezionato; GESTIONE 2^PIN
                         if(selected_pin.type == first_pin_type):
                             print("WARNING, you can't connect 2 inputs or 2 outputs")
                         else:
                             print("secondo pin selezionato con successo")
-                            current_connetion.set_pin(selected_pin)
-                            GLOBAL_visual_connections.append(current_connetion) #! non funziona 
-                            current_connetion = None #reset
+                            connection_being_created.set_pin(selected_pin)#todo setta collegamento logico se entrambi i pin sono != NULL
+                            #!connection_being_created.start_pin.visual_gate.
+                            connection_being_created.get_end_pin_visual_gate().visual_connections.add(connection_being_created)#todo non necessaria
+                            connection_being_created.is_connection_finalized = True
+                            connection_being_created = None #reset
                             is_first_pin_already_selected = False #reset
                             first_pin_type = None #reset
 
                 else:#hai premuto sul vuoto o su un gate
                     print("hai premuto sul vuoto o su un gate")
-                    current_connetion = None #reset
+                    connection_being_created = None #reset
                     is_first_pin_already_selected = False #reset
                     first_pin_type = None #reset
                 
@@ -372,9 +414,9 @@ while running:
                     #print(f"{mouse_x}, {mouse_y}")
                     selected_gate.visual_gate_start_drag(mouse_x, mouse_y)
 
-            else:
+            else:#* GESTIONE SELEZIONE E DESELEZIONEDI GATES E CONNESSIONI
                 #print("CTRL STA VENENDO PREMUTO")
-                current_connetion = None #reset
+                connection_being_created = None #reset
                 is_first_pin_already_selected = False #reset
                 first_pin_type = None #reset
                 if(selected_gate):
@@ -398,7 +440,7 @@ while running:
                 print(f"selected_pin: {selected_pin}")
                 print(f"is_first_pin_already_selected: {is_first_pin_already_selected}")
                 print(f"first_pin_type: {first_pin_type}")
-                print(f"current_connetion: {current_connetion}")
+                print(f"connection_being_created: {connection_being_created}")
                 print("")
             
         elif event.type == pygame.MOUSEBUTTONUP:
@@ -420,9 +462,10 @@ while running:
             for vg in gates_chosen_for_action_set:
                 GLOBAL_visual_gates.remove(vg)
                 vg.delete_internal_logic_gate()
+
             for vc in connections_chosen_for_action_set:
                 vc.remove_self()
-                #vc.delete_logic_connection()
+                vc.unconnect_logic_pins()
                 pass
             gates_chosen_for_action_set.clear()
             connections_chosen_for_action_set.clear()
@@ -436,18 +479,18 @@ while running:
             gates_chosen_for_action_set.clear()
             gates_chosen_for_action_set.update(copied_gates)
             for vc in gates_chosen_for_action_set:
-                vc.x+=10
-                vc.y+=10
+                vc.x+=30
+                vc.y+=30
             GLOBAL_visual_gates.extend(copied_gates)
 
         elif event.type == pygame.MOUSEMOTION:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            if(current_connetion != None): #*GESTIONE CONNESSIONE
-                current_connetion.auto_update_connection()
+            if(connection_being_created != None): #*GESTIONE CONNESSIONE
+                connection_being_created.auto_update_connection()
                 if(first_pin_type == "in"):
-                    current_connetion.set_coordinates(end=(mouse_x,mouse_y))
+                    connection_being_created.set_coordinates(end=(mouse_x,mouse_y))
                 else:
-                    current_connetion.set_coordinates(start=(mouse_x,mouse_y))
+                    connection_being_created.set_coordinates(start=(mouse_x,mouse_y))
             
             if selected_gate:#*GESTIONE SPOSTAMENTO selected_gate
                 selected_gate.visual_gate_update_position(mouse_x, mouse_y)
@@ -459,13 +502,14 @@ while running:
     screen.fill(WHITE)
     
     # Draw all gates
-    for visual_gate in GLOBAL_visual_gates:
+    for visual_gate in GLOBAL_visual_gates.copy():
         visual_gate.draw(screen)
-        for vc in visual_gate.visual_connections:
+        for vc in visual_gate.visual_connections.copy():
             vc.draw(screen)
 
-    for visual_gate in GLOBAL_visual_gates:#I need a separate for beacuse connections must be on top of gates
-        for vc in visual_gate.visual_connections:
+    for visual_gate in GLOBAL_visual_gates.copy():#I need a separate for beacuse connections must be on top of gates
+        for vc in visual_gate.visual_connections.copy():
+            #print(f"{vc.start_pin.visual_gate.gate.name} | {vc.end_pin.visual_gate.gate.name}")
             vc.draw(screen)  
 
     '''#!old
@@ -473,8 +517,8 @@ while running:
         connection.draw(screen)
     ''' 
 
-    if(current_connetion != None):
-        current_connetion.draw(screen=screen)
+    if(connection_being_created != None):
+        connection_being_created.draw(screen=screen)
     
     pygame.display.flip()
 

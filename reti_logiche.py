@@ -121,14 +121,18 @@ class AbstractGate(LogicClass):
     def get_input_gate_by_input_signal_index(self, ix:int):
         ris = self.input_gates_dict.get(ix)
         #print("ris: "+ str(ris))
+        '''
         if(ris == None):
-            raise Exception(f"@@@INTERNAL ERROR: input_gate at ix {ix} is None")
+            raise Warning(f"@@@INTERNAL ERROR: input_gate at ix {ix} is None")
+        '''
         return ris
 
     def get_all_input_gates(self):
         ris:set[tuple[AbstractGate,int]] = set()
         for ix in range(self.number_of_inputs):
-            ris.add(self.get_input_gate_by_input_signal_index(ix))
+            gi = self.get_input_gate_by_input_signal_index(ix)
+            if(gi):
+                ris.add(gi)
         return ris
 
 
@@ -464,7 +468,7 @@ or2.connect_input_gate_to_input_signal((prova_ext,0),0)
 #ciclo
 not1 = NOT(name="not1")
 not2 = NOT(name="not2", input_gate=(not1,0))
-not1.connect_input_gate_to_input_signal((not2,0),0)
+#not1.connect_input_gate_to_input_signal((not2,0),0)
 
 '''
 not1 = NOT(name="not1")
