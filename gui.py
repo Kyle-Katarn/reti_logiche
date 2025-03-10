@@ -401,7 +401,6 @@ while running:
                         else:
                             print("secondo pin selezionato con successo")
                             connection_being_created.set_pin(selected_pin)#todo setta collegamento logico se entrambi i pin sono != NULL
-                            #!connection_being_created.start_pin.visual_gate.
                             connection_being_created.get_end_pin_visual_gate().visual_connections.add(connection_being_created)#todo non necessaria
                             connection_being_created.is_connection_finalized = True
                             connection_being_created = None #reset
@@ -544,24 +543,25 @@ def connection_debugger(logic_gate:LogicClass):
     input_visual_gate:VisualGate = dict_logic_to_visual_gates[logic_gate]
     visual_connections_set:set[VisualConnection] = input_visual_gate.visual_connections
 
-    print("Input pins:")
-    for ivp in visual_gate.visual_input_pins:
-        print(f"input pin {ivp}")
+    if(len(visual_gate.visual_input_pins) != 0):
+        print(f"Input pins of {visual_gate.gate.name}")
+        for ivp in visual_gate.visual_input_pins:
+            print(f"input pin {ivp}")
 
     if(len(visual_connections_set) == 0):
         print(f"NO connections point to {logic_gate.name}")
     for vc in visual_connections_set:
+        print(f"#@visual connection: {vc}")
         start_pin:VisualPin = vc.start_pin
         end_pin:VisualPin = vc.end_pin
-        print(f"start_pin father: {start_pin.visual_gate.gate} | start_pin_type: {start_pin.type} | start_pin_color: {start_pin.color}")
-        print(f"end_pin father: {end_pin.visual_gate.gate} | end_pin_type: {end_pin.type} | end_pin_color: {end_pin.color}")
-
-        output_visual_gate:VisualGate = start_pin.visual_gate
-        print("\n\nOutput VisualGate pins:")
-        for ovp in output_visual_gate.visual_output_pins:
-            print(f"output pin {ovp} | color: {ovp.color}")
+        print(f"start_pin: {start_pin}")
+        print(f"    start_pin father: {start_pin.visual_gate.gate.name} | start_pin_type: {start_pin.type} | start_pin_ix: {start_pin.logic_gate_index} | start_pin_color: {start_pin.color}")
+        print(f"end_pin: {end_pin}")
+        print(f"    end_pin father: {end_pin.visual_gate.gate.name} | end_pin_type: {end_pin.type} | end_pin_ix: {end_pin.logic_gate_index} | end_pin_color: {end_pin.color}")
+        print("")
 
     
 
 
 connection_debugger(not2)#todo errore!!
+#!metti apposto la documentazione!!!
