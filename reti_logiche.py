@@ -32,6 +32,11 @@ class LogicClass:
     def get_all_input_gates(self):
         return set()
 
+    def remove_input_gate(self, index:int):
+        pass
+
+    def remove_child_gate(self, index:int, gate:"LogicClass"):
+        pass
 
 
 
@@ -43,29 +48,35 @@ class SwitchGate(LogicClass):
         self.output_signal: bool = False
         GLOBAL_ALL_SWITCHES_LIST.append(self)
         self.output_signal = inital_value
-        self.child_gates_set: set[tuple['AbstractGate', int]] = set()
+        #self.child_gates_set: set[tuple['AbstractGate', int]] = set()#todo refactor
+        self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
+        self.child_gates_dict[0] = set() 
     
     def toggle(self):
         self.output_signal = not self.output_signal
         self.has_oputput_signal_changed = True
     
     def add_child_gate(self, child_gate_tup:tuple['AbstractGate', int]):
-            self.child_gates_set.add((child_gate_tup))
+            #self.child_gates_set.add((child_gate_tup))#todo
+            self.child_gates_dict[0].add(child_gate_tup)
     
     def get_output_signal_value(self, ix=0):
         return self.output_signal
     
     def get_all_child_gates(self):
-        return self.child_gates_set
+        return self.child_gates_dict[0]
     
     def get_child_gates_dict(self):
         res = dict()
         res[0] = self.get_all_child_gates()
         return res
+    
+    def remove_child_gate(self, index:int, gate:"LogicClass"):
+        self.child_gates_dict[0].remove(gate)
 
     def print_child_gates(self):
         print("Child gates of(", self, "): ")
-        for c in self.child_gates_set:
+        for c in self.child_gates_dict.get(0):
             print(c)
         print("")
 
@@ -117,6 +128,9 @@ class AbstractGate(LogicClass):
     
     def get_child_gates_dict(self):
         return self.child_gates_dict
+    
+    def remove_child_gate(self, index:int, gate:"LogicClass"):
+        self.child_gates_dict[index].remove(gate)
 
     def get_input_gate_by_input_signal_index(self, ix:int):
         ris = self.input_gates_dict.get(ix)
@@ -134,6 +148,14 @@ class AbstractGate(LogicClass):
             if(gi):
                 ris.add(gi)
         return ris
+    
+    def remove_input_gate(self, index:int):#!UNTESETED
+        gate_tup:tuple[LogicClass,int] = self.input_gates_dict.pop(index, None)
+        if(gate_tup):
+            input_gate, output_signal_ix = gate_tup
+            input_gate.remove_child_gate(output_signal_ix, self)
+
+            
 
 
     

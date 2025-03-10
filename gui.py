@@ -93,6 +93,7 @@ class VisualConnection:
 
     def unconnect_logic_pins(self):
         print("unconnect_logic_pins NON FA NULLA")
+        #!self.end_pin.unconnect_logic_pin()#rimuove l'input gate
         pass
 
     def get_end_pin_visual_gate(self):
