@@ -45,10 +45,10 @@ class VisualConnection:
             self.start_pin = pin
             self.start_pin.pin_of_visual_connections_set.add(self)
         else:#type = in
-            print(f"pin.pin_of_visual_connections_set {pin.pin_of_visual_connections_set}")
             if(pin.pin_of_visual_connections_set != set()):#todo obbligo refactoring???
+                print(f"pin.pin_of_visual_connections_set: {pin.pin_of_visual_connections_set}")
                 print("WARNING, rimosso una connessione per coneterne una nuova")
-                old_input_pin_connection:VisualConnection = pin.pin_of_visual_connections_set.pop()
+                old_input_pin_connection:VisualConnection = next(iter(pin.pin_of_visual_connections_set))
                 old_input_pin_connection.remove_self()
 
             self.end_pin = pin
@@ -68,7 +68,7 @@ class VisualConnection:
     def draw(self, screen):
         if(self.start_pin and self.end_pin):
             self.is_connection_finalized = True
-        if(self.is_connection_finalized and (not self.start_pin.pin_of_visual_gate in GLOBAL_visual_gates)):#!MOLTO GOOFY ma non so come rimuovere la classe in altro modo
+        if(self.is_connection_finalized and (not self.start_pin.father_visual_gate in GLOBAL_visual_gates)):#!MOLTO GOOFY ma non so come rimuovere la classe in altro modo
             self.remove_self()
         if(self.is_connection_finalized):
             self.auto_update_connection()
@@ -85,6 +85,8 @@ class VisualConnection:
     def remove_self(self):
         print(f"gate: {self.get_end_pin_visual_gate().gate}")
         self.get_end_pin_visual_gate().visual_connections.remove(self)
+        self.start_pin.pin_of_visual_connections_set.remove(self)
+        self.end_pin.pin_of_visual_connections_set.remove(self)#!da errore
         self.unconnect_logic_pins()
 
     def connect_logic_pins(self):
@@ -92,12 +94,12 @@ class VisualConnection:
         pass#boh
 
     def unconnect_logic_pins(self):
-        print("unconnect_logic_pins NON FA NULLA")
-        #!self.end_pin.unconnect_logic_pin()#rimuove l'input gate
+        #print("unconnect_logic_pins NON FA NULLA")
+        self.end_pin.unconnect_logic_pin()#rimuove l'input gate
         pass
 
     def get_end_pin_visual_gate(self):
-        return self.end_pin.pin_of_visual_gate
+        return self.end_pin.father_visual_gate
 
     def is_visual_connection_clicked(self, px: int, py: int):
         # Calculate the distance from the point to the line segment
@@ -121,11 +123,11 @@ class VisualConnection:
 
 class VisualPin:
     CONST_hitbox_scaling:int = 2
-    def __init__(self, pin_of_visual_gate:"VisualGate", logic_gate_index:int, offset_x:int, offset_y:int, rad:int, type:str):
+    def __init__(self, father_visual_gate:"VisualGate", logic_gate_index:int, offset_x:int, offset_y:int, rad:int, type:str):
         self.type:str = type
         self.pin_of_visual_connections_set:set[VisualConnection] = set()
         self.logic_gate_index:int = logic_gate_index
-        self.pin_of_visual_gate:"VisualGate" = pin_of_visual_gate
+        self.father_visual_gate:"VisualGate" = father_visual_gate
         #^^Avere una reference serve a evitare di dover riassegnare manualmente le coordinate ogni volta che sposto la VisualGate, forse era meglio avere una ref al padre? si era meglio
         self.offset_x = offset_x
         self.offset_y = offset_y
@@ -133,19 +135,32 @@ class VisualPin:
         self.color = BLACK
 
     def visual_pin_conains_point(self, px: int, py: int):
-        Dx:int = px-(self.pin_of_visual_gate.x+self.offset_x)
-        Dy:int = py-(self.pin_of_visual_gate.y+self.offset_y)
+        Dx:int = px-(self.father_visual_gate.x+self.offset_x)
+        Dy:int = py-(self.father_visual_gate.y+self.offset_y)
         return sqrt(Dx**2 + Dy**2) <= self.radious * self.CONST_hitbox_scaling
 
     def draw(self):
         if(self.type == "in"):
-            self.color = RED if self.pin_of_visual_gate.gate.get_input_signal_value(self.logic_gate_index) else BLACK
+            self.color = RED if self.father_visual_gate.gate.get_input_signal_value(self.logic_gate_index) else BLACK
         else:
-            self.color = RED if self.pin_of_visual_gate.gate.get_output_signal_value(self.logic_gate_index) else BLACK
-        pygame.draw.circle(screen, self.color, (self.pin_of_visual_gate.x+self.offset_x, self.pin_of_visual_gate.y+self.offset_y), self.radious)
+            self.color = RED if self.father_visual_gate.gate.get_output_signal_value(self.logic_gate_index) else BLACK
+        pygame.draw.circle(screen, self.color, (self.father_visual_gate.x+self.offset_x, self.father_visual_gate.y+self.offset_y), self.radious)
 
     def get_coordinates(self):
-        return (self.pin_of_visual_gate.x+self.offset_x, self.pin_of_visual_gate.y+self.offset_y)
+        return (self.father_visual_gate.x+self.offset_x, self.father_visual_gate.y+self.offset_y)
+    
+    def unconnect_logic_pin(self):
+        if(self.type == "in"):
+            self.father_visual_gate.gate.remove_input_gate(self.logic_gate_index)
+        else:
+            print("self.type == out, non ho considerato il caso in cui si elimina un output MANUALMENTE")
+
+    def connect_logic_pin(self, logic_gate:LogicClass):
+        if(self.type == "in"):
+            self.father_visual_gate.gate.add_input_gate(logic_gate, self.logic_gate_index)
+        else:
+            print("self.type == out, non ho considerato il caso in cui si aggiunge un output MANUALMENTE")
+        
     
 
 
@@ -566,9 +581,9 @@ def connection_debugger(logic_gate:LogicClass):
         start_pin:VisualPin = vc.start_pin
         end_pin:VisualPin = vc.end_pin
         print(f"start_pin: {start_pin}")
-        print(f"    start_pin father: {start_pin.pin_of_visual_gate.gate.name} | start_pin_type: {start_pin.type} | start_pin_ix: {start_pin.logic_gate_index} | start_pin_color: {start_pin.color}")
+        print(f"    start_pin father: {start_pin.father_visual_gate.gate.name} | start_pin_type: {start_pin.type} | start_pin_ix: {start_pin.logic_gate_index} | start_pin_color: {start_pin.color}")
         print(f"end_pin: {end_pin}")
-        print(f"    end_pin father: {end_pin.pin_of_visual_gate.gate.name} | end_pin_type: {end_pin.type} | end_pin_ix: {end_pin.logic_gate_index} | end_pin_color: {end_pin.color}")
+        print(f"    end_pin father: {end_pin.father_visual_gate.gate.name} | end_pin_type: {end_pin.type} | end_pin_ix: {end_pin.logic_gate_index} | end_pin_color: {end_pin.color}")
         print("")
 
     

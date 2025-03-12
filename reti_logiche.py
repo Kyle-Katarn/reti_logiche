@@ -94,9 +94,13 @@ class AbstractGate(LogicClass):
             raise Exception(f"@@@INTERNAL ERROR: connect_input_gate_to_input_signal() WANTS a TUPLE")
         if input_signal_ix >= self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
-        self.input_gates_dict[input_signal_ix] = param
         input_gate, input_gate_signal_ix = param
-        input_gate.add_child_gate((self, input_signal_ix))
+        if(self.input_gates_dict.get(input_signal_ix) == None):
+            input_gate.add_child_gate((self, input_signal_ix))#!UNTESTED 
+        else:
+            self.remove_input_gate(input_signal_ix)#TODO SHIT NAME
+        self.input_gates_dict[input_signal_ix] = param
+        #!FIX devi considerare il caso in cui il segnale di input è già pilotato da un'altra gate
 
     def connect_multiple_input_gates_to_input_signals(self, param:list[tuple["AbstractGate",int]], first_ix:int =0):
         if not isinstance(param, list):
@@ -149,11 +153,15 @@ class AbstractGate(LogicClass):
                 ris.add(gi)
         return ris
     
-    def remove_input_gate(self, index:int):#!UNTESETED
-        gate_tup:tuple[LogicClass,int] = self.input_gates_dict.pop(index, None)
+    def remove_input_gate(self, input_index:int):#!UNTESTED
+        gate_tup:tuple[LogicClass,int] = self.input_gates_dict.pop(input_index, None)
         if(gate_tup):
             input_gate, output_signal_ix = gate_tup
-            input_gate.remove_child_gate(output_signal_ix, self)
+            print("input_gate: "+str(input_gate))
+            print("output_signal_ix: "+str(output_signal_ix))
+            print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
+            input_gate.remove_child_gate(output_signal_ix, (self, input_index))
+            print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
 
             
 
@@ -216,10 +224,10 @@ class ModuleGate(AbstractGate):
 
     #aneurysm = useless optimization: not all internal_gates_affected_by_input_signal_ix gates but only the affected by input ones
     def compute_result_and_returns_gates_affeted_by_the_result(self, compute_all__internal_gates_affected_by_module_input_signals:bool=False):
-        if(compute_all__internal_gates_affected_by_module_input_signals):
+        if(compute_all__internal_gates_affected_by_module_input_signals):#calcola tutti i gate di 1^livello
             for ix in range(self.number_of_inputs):
                 self.internal_gates_affected_by_last_level_signal_changes.update(self.internal_gates_affected_by_input_signal_ix.get(ix))
-        gates_affected_by_the_result:set[AbstractGate] = set()
+        gates_affected_by_the_result:set[AbstractGate] = set()#all basic gates?
         for ig, ig_input_signal_ix in self.internal_gates_affected_by_last_level_signal_changes:
             print("ig: "+str(ig))
             gates_affected_by_the_result.update(ig.compute_result_and_returns_gates_affeted_by_the_result())
