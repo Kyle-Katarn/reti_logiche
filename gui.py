@@ -245,7 +245,11 @@ class VisualGate:
     
     #*ELIMINAZIONE
     def delete_internal_logic_gate(self):
-        print("DOES NOTHING, THIS SHOULD REMOVE LOGIC GATE FROM SIM")
+        try:
+            considered_gates.remove(self.gate)
+        except:
+            print("it is dumb you are trying to remove swithces")#???
+        print("MAYBE WORKS, THIS SHOULD REMOVE LOGIC GATE FROM SIM")
 
     def draw(self, screen):
         # Draw gate body
