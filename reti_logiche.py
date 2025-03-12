@@ -95,12 +95,11 @@ class AbstractGate(LogicClass):
         if input_signal_ix >= self.number_of_inputs:
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
         input_gate, input_gate_signal_ix = param
-        if(self.input_gates_dict.get(input_signal_ix) == None):
-            input_gate.add_child_gate((self, input_signal_ix))#!UNTESTED 
-        else:
+        if(self.input_gates_dict.get(input_signal_ix) != None):#!UNTESTED 
             self.remove_input_gate(input_signal_ix)#TODO SHIT NAME
+        input_gate.add_child_gate((self, input_signal_ix))
         self.input_gates_dict[input_signal_ix] = param
-        #!FIX devi considerare il caso in cui il segnale di input è già pilotato da un'altra gate
+        print(f"Connected input signal {input_signal_ix} of gate '{self.name}' to output signal {input_gate_signal_ix} of gate '{input_gate.name}'")
 
     def connect_multiple_input_gates_to_input_signals(self, param:list[tuple["AbstractGate",int]], first_ix:int =0):
         if not isinstance(param, list):
@@ -162,6 +161,8 @@ class AbstractGate(LogicClass):
             print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
             input_gate.remove_child_gate(output_signal_ix, (self, input_index))
             print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
+            print(f"UNconnected input signal {input_index} of gate '{self.name}' from output signal {output_signal_ix} of gate '{input_gate.name}'")
+
 
             
 

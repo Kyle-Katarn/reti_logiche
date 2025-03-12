@@ -90,8 +90,8 @@ class VisualConnection:
         self.unconnect_logic_pins()
 
     def connect_logic_pins(self):
-        print("connect_logic_pins NON FA NULLA")
-        pass#boh
+        #print("connect_logic_pins NON FA NULLA")
+        self.end_pin.connect_logic_pin((self.start_pin.father_visual_gate.gate, self.start_pin.logic_gate_index))#!UNTESTED FIX
 
     def unconnect_logic_pins(self):
         #print("unconnect_logic_pins NON FA NULLA")
@@ -155,9 +155,9 @@ class VisualPin:
         else:
             print("self.type == out, non ho considerato il caso in cui si elimina un output MANUALMENTE")
 
-    def connect_logic_pin(self, logic_gate:LogicClass):
+    def connect_logic_pin(self, input_gate_tup:tuple[LogicClass, int]):
         if(self.type == "in"):
-            self.father_visual_gate.gate.add_input_gate(logic_gate, self.logic_gate_index)
+            self.father_visual_gate.gate.connect_input_gate_to_input_signal(input_gate_tup, self.logic_gate_index)
         else:
             print("self.type == out, non ho considerato il caso in cui si aggiunge un output MANUALMENTE")
         
@@ -589,5 +589,5 @@ def connection_debugger(logic_gate:LogicClass):
     
 
 
-connection_debugger(not2)#todo errore!!
+#connection_debugger(not2)#todo errore!!
 #!metti apposto la documentazione!!!
