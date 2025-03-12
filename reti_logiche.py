@@ -431,7 +431,7 @@ class XOR(BasicGate):
 
 def apply_SwitchGates_immediatly(considered_switches:list[SwitchGate]):
     for p in considered_switches:
-        for child_gate, child_gate_input_signal_ix in p.child_gates_set:
+        for child_gate, child_gate_input_signal_ix in p.child_gates_dict.get(0):
             #print("ciao: "+ str(child_gate), str(child_gate_input_signal_ix))
             child_gate.input_gates_results_set_input_signals(child_gate_input_signal_ix)
                 
