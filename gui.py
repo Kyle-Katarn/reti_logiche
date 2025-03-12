@@ -53,7 +53,7 @@ class VisualConnection:
 
             self.end_pin = pin
             self.end_pin.pin_of_visual_connections_set.add(self)
-            self.get_end_pin_visual_gate().visual_connections.add(self)
+            #self.get_end_pin_visual_gate().visual_connections.add(self)#!!!
             self.connect_logic_pins()
                 
 
@@ -84,14 +84,14 @@ class VisualConnection:
 
     def remove_self(self):
         print(f"gate: {self.get_end_pin_visual_gate().gate}")
-        self.get_end_pin_visual_gate().visual_connections.remove(self)
+        #self.get_end_pin_visual_gate().visual_connections.remove(self)#!!!
         self.start_pin.pin_of_visual_connections_set.remove(self)
         self.end_pin.pin_of_visual_connections_set.remove(self)#!da errore
         self.unconnect_logic_pins()
 
     def connect_logic_pins(self):
         #print("connect_logic_pins NON FA NULLA")
-        self.end_pin.connect_logic_pin((self.start_pin.father_visual_gate.gate, self.start_pin.logic_gate_index))#!UNTESTED FIX
+        self.end_pin.connect_logic_pin((self.start_pin.father_visual_gate.gate, self.start_pin.logic_gate_index))
 
     def unconnect_logic_pins(self):
         #print("unconnect_logic_pins NON FA NULLA")
@@ -167,7 +167,7 @@ class VisualPin:
 
 class VisualGate:
     def __init__(self, gate: BasicGate, x: int, y: int):
-        self.visual_connections: set[VisualConnection] = set()#! FIX, NON USATO, VISUAL CONNECTIONS GLOBALE NON VA BENE X LA COPIATURA
+        #self.visual_connections: set[VisualConnection] = set()#!!!
         self.visual_input_pins: list[VisualPin] = []
         self.visual_output_pins: list[VisualPin] = []
         self.gate = gate
@@ -229,9 +229,15 @@ class VisualGate:
         return selected_pin
     
     #*Gestione SELEZIONE CONNESSIONE (CONNESSIONE)
+    def get_all_visual_connections(self):
+        all_connections = set()
+        for pin in self.visual_input_pins:
+            all_connections.update(pin.pin_of_visual_connections_set)
+        return all_connections
+
     def check_if_a_visual_connection_is_cicked(self, x: int, y: int):
         selected_connection:VisualConnection = None
-        for connection in self.visual_connections:
+        for connection in self.get_all_visual_connections():
             if(connection.is_visual_connection_clicked(x,y)):
                 selected_connection = connection
                 break
@@ -258,7 +264,7 @@ class VisualGate:
             self.visual_output_pins[output_pin_ix].draw()
 
         #* Draw Connections
-        for vc in self.visual_connections:
+        for vc in self.get_all_visual_connections():
             vc.draw(screen)
             
 
@@ -348,8 +354,7 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
                 new_connection:VisualConnection = VisualConnection()
                 new_connection.set_pin(start_pin)
                 new_connection.set_pin(end_pin)
-                visual_child_gate.visual_connections.add(new_connection)
-                #GLOBAL_visual_connections.append(new_connection) #! CHANGE
+                #visual_child_gate.visual_connections.add(new_connection)#!!!
     return visual_gates
         
 
@@ -567,7 +572,7 @@ pygame.quit()
 def connection_debugger(logic_gate:LogicClass):
     print("")
     input_visual_gate:VisualGate = dict_logic_to_visual_gates[logic_gate]
-    visual_connections_set:set[VisualConnection] = input_visual_gate.visual_connections
+    visual_connections_set:set[VisualConnection] = input_visual_gate.get_all_visual_connections()
 
     if(len(visual_gate.visual_input_pins) != 0):
         print(f"Input pins of {visual_gate.gate.name}")
