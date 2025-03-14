@@ -5,6 +5,7 @@ from ui_elements import *
 from ui_elements import InputField
 from CONST import *
 from math import sqrt
+from visual_classes import *
 
 # Initialize Pygame
 pygame.init()
@@ -405,11 +406,6 @@ while running:
     keys_pressed = pygame.key.get_pressed()#premute in un dato frame, dura N frame
 
     for event in pygame.event.get():
-        '''
-        for button in UI_ELEMENTS_SET:
-            button.draw(screen)
-            button.handle_event(event)
-        '''
         if event.type == pygame.QUIT:
             running = False
 
