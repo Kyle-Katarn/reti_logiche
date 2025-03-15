@@ -50,7 +50,7 @@ dict_logic_to_visual_gates:dict[LogicClass, VisualGate] = {}#useful for debug
 def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered_gates: list[LogicClass] = GLOBAL_ALL_BASIC_GATES_LIST, considered_swiches = GLOBAL_ALL_SWITCHES_LIST):
     #todo 1 -> tutti i gate puntati da 1 -> 2. ->
     
-    visual_gates:set[VisualGate] = []
+    visual_gates:set[VisualGate] = set()
     x, y = -100, 50
     dict_BFS_level_to_next_y_coo:dict[int, int] = {}
 
@@ -69,7 +69,7 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
             
         visual_child_gate = VisualGate(gate, x, y)
         dict_logic_to_visual_gates[gate] = visual_child_gate
-        visual_gates.append(visual_child_gate)
+        visual_gates.add(visual_child_gate)#? funzionava con .append?
 
     for father_gate in lista_obj:
         father_gate_child_dict:dict[int,tuple[AbstractGate,int]] = father_gate.get_child_gates_dict()
