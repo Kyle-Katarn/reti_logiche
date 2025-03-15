@@ -18,7 +18,19 @@ class LogicClass:
     def __init__(self, number_of_inputs, number_of_outputs, name: str = "LogicClass"):
         self.name: str = name
         self.number_of_inputs:int = number_of_inputs
+        self.input_gates_dict:dict[int, tuple['AbstractGate', int]] = {} #*input_gate e l'ix del segnale di output di input_gate
         self.number_of_outputs:int = number_of_outputs
+        self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
+        for ix in range(number_of_outputs):
+            self.child_gates_dict[ix] = set()
+
+        self.input_signals_name:dict[int, str] = {} #!!!
+        for ix in range(number_of_inputs):
+            self.input_signals_name[ix] = "/"
+
+        self.output_signals_name:dict[int, str] = {}
+        for ix in range(self.number_of_outputs):
+            self.output_signals_name[ix] = "/"
 
     def __str__(self):
         return "Name: "+ str(self.name)
@@ -26,102 +38,9 @@ class LogicClass:
     def get_name(self):
         return self.name
     
-    def get_all_child_gates(self):
-        pass
-    
-    def get_all_input_gates(self):
-        return set()
-
-    def remove_input_gate(self, index:int):
-        pass
-
-    def remove_child_gate(self, index:int, gate:"LogicClass"):
-        pass
-
-
-
-
-class SwitchGate(LogicClass):
-    def __init__(self, inital_value:bool =True, name: str = "SwitchGate"):
-        super().__init__(0, 1, name)
-        self.number_of_outputs = 1
-        self.output_signal: bool = False
-        GLOBAL_ALL_SWITCHES_LIST.append(self)
-        self.output_signal = inital_value
-        #self.child_gates_set: set[tuple['AbstractGate', int]] = set()#todo refactor
-        self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
-        self.child_gates_dict[0] = set() 
-    
-    def toggle(self):
-        self.output_signal = not self.output_signal
-        self.has_oputput_signal_changed = True
-    
-    def add_child_gate(self, child_gate_tup:tuple['AbstractGate', int]):
-            #self.child_gates_set.add((child_gate_tup))#todo
-            self.child_gates_dict[0].add(child_gate_tup)
-    
-    def get_output_signal_value(self, ix=0):
-        return self.output_signal
-    
-    def get_all_child_gates(self):
-        return self.child_gates_dict[0]
-    
-    def get_child_gates_dict(self):
-        res = dict()
-        res[0] = self.get_all_child_gates()
-        return res
-    
-    def remove_child_gate(self, index:int, gate:"LogicClass"):
-        self.child_gates_dict[0].remove(gate)
-
-    def print_child_gates(self):
-        print("Child gates of(", self, "): ")
-        for c in self.child_gates_dict.get(0):
-            print(c)
-        print("")
-
-
-class AbstractGate(LogicClass):
-    def __init__(self, number_of_inputs, number_of_outputs, name: str = "AbstractGate"):
-        super().__init__(number_of_inputs, number_of_outputs, name)
-        self.input_gates_dict:dict[int, tuple['AbstractGate', int]] = {} #*input_gate e l'ix del segnale di output di input_gate
-        self.child_gates_dict:dict[int, set[tuple['AbstractGate', int]]] = {} #*child_gate e l'ix del segnale di input di child_gate
-        for i in range(self.number_of_outputs):
-            self.child_gates_dict[i] = set()
-
-    def connect_input_gate_to_input_signal(self, param: tuple["LogicClass", int], input_signal_ix:int):
-        if not isinstance(param, tuple):
-            raise Exception(f"@@@INTERNAL ERROR: connect_input_gate_to_input_signal() WANTS a TUPLE")
-        if input_signal_ix >= self.number_of_inputs:
-            raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
-        input_gate, input_gate_signal_ix = param
-        if(self.input_gates_dict.get(input_signal_ix) != None):#!UNTESTED 
-            print("it is called from connect_input_gate_to_input_signal")
-            self.remove_input_gate(input_signal_ix)#TODO SHIT NAME
-        input_gate.add_child_gate((self, input_signal_ix))
-        self.input_gates_dict[input_signal_ix] = param
-        print(f"Connected input signal {input_signal_ix} of gate '{self.name}' to output signal {input_gate_signal_ix} of gate '{input_gate.name}'")
-
-    def connect_multiple_input_gates_to_input_signals(self, param:list[tuple["AbstractGate",int]], first_ix:int =0):
-        if not isinstance(param, list):
-            raise Exception(f"@@@INTERNAL ERROR: connect_multiple_input_gates_to_input_signals() WANTS a LIST")
-        if first_ix + len(param) > self.number_of_inputs:
-            raise IndexError("ERRORE: Input signal index out of range, your last index index: " + str(first_ix + len(param) - 1) + " last available index: " + str((self.number_of_inputs)-1))
-
-        for tup in param:
-            self.connect_input_gate_to_input_signal(tup, first_ix)
-            first_ix += 1
-
-    def input_gates_results_set_input_signals(self, input_signal_ix): 
-        pass 
-    
-    def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
-        pass #I need this method to end the recursion when I reach a BasicGate
-
-    def _get_all_internal_basic_gates(self):
-        return [self] #I need this method to end the recursion when I reach a BasicGate
-
     def get_child_gates_by_output_signal_index(self, ix:int):
+        if(ix >= self.number_of_outputs):
+            raise Exception(f"ix: {ix} > last_output_signal_ix: {self.number_of_outputs-1}")
         return self.child_gates_dict.get(ix)
     
     def get_all_child_gates(self):
@@ -133,17 +52,10 @@ class AbstractGate(LogicClass):
     def get_child_gates_dict(self):
         return self.child_gates_dict
     
-    def remove_child_gate(self, index:int, gate:"LogicClass"):
-        self.child_gates_dict[index].remove(gate)
-
     def get_input_gate_by_input_signal_index(self, ix:int):
-        ris = self.input_gates_dict.get(ix)
-        #print("ris: "+ str(ris))
-        '''
-        if(ris == None):
-            raise Warning(f"@@@INTERNAL ERROR: input_gate at ix {ix} is None")
-        '''
-        return ris
+        if(ix >= self.number_of_inputs):
+            raise Exception(f"ix: {ix} > last_input_signal_ix: {self.number_of_inputs-1}")
+        return self.input_gates_dict.get(ix)
 
     def get_all_input_gates(self):
         ris:set[tuple[AbstractGate,int]] = set()
@@ -153,21 +65,91 @@ class AbstractGate(LogicClass):
                 ris.add(gi)
         return ris
     
-    def remove_input_gate(self, input_index:int):#!UNTESTED
+    def connect_input_gate_to_input_signal(self, input_gate_tup: tuple["LogicClass", int], input_signal_ix:int):
+        if not isinstance(input_gate_tup, tuple):
+            raise Exception(f"@@@INTERNAL ERROR: connect_input_gate_to_input_signal() WANTS a TUPLE")
+        if input_signal_ix >= self.number_of_inputs:
+            raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
+        input_gate, input_gate_output_signal = input_gate_tup
+        if(self.input_gates_dict.get(input_signal_ix) != None):#!UNTESTED 
+            self.unconnect_input_gate_from_input_signal(input_signal_ix)#TODO SHIT NAME
+        input_gate.add_child_gate(input_gate_output_signal,(self, input_signal_ix))
+        self.input_gates_dict[input_signal_ix] = input_gate_tup
+        print(f"Connected input signal {input_signal_ix} of gate '{self.name}' to output signal {input_gate_output_signal} of gate '{input_gate.name}'")
+
+    def connect_multiple_input_gates_to_input_signals(self, input_gate_tup_list:list[tuple["AbstractGate",int]], first_ix:int =0):
+        if not isinstance(input_gate_tup_list, list):
+            raise Exception(f"@@@INTERNAL ERROR: connect_multiple_input_gates_to_input_signals() WANTS a LIST")
+        if first_ix + len(input_gate_tup_list) > self.number_of_inputs:
+            raise Exception("ERRORE: Input signal index out of range, your last index index: " + str(first_ix + len(input_gate_tup_list) - 1) + " last available index: " + str((self.number_of_inputs)-1))
+
+        for tup in input_gate_tup_list:
+            self.connect_input_gate_to_input_signal(tup, first_ix)
+            first_ix += 1
+    
+    def unconnect_input_gate_from_input_signal(self, input_index:int):#!UNTESTED
         gate_tup:tuple[LogicClass,int] = self.input_gates_dict.pop(input_index, None)
         if(gate_tup):
             input_gate, output_signal_ix = gate_tup
-            print("input_gate: "+str(input_gate))
-            print("output_signal_ix: "+str(output_signal_ix))
-            print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
             input_gate.remove_child_gate(output_signal_ix, (self, input_index))
-            print(f"set: {input_gate.child_gates_dict[output_signal_ix]}")
             print(f"UNconnected input signal {input_index} of gate '{self.name}' from output signal {output_signal_ix} of gate '{input_gate.name}'")
 
+    def add_child_gate(self, index:int, gate_tup:tuple["LogicClass",int]):
+        self.child_gates_dict[index].add(gate_tup)
+    
+    def remove_child_gate(self, index:int, gate_tup:tuple["LogicClass",int]):
+        self.child_gates_dict[index].remove(gate_tup)
 
-            
+    
 
 
+
+
+class SwitchGate(LogicClass):
+    def __init__(self, inital_value:bool =True, name: str = "SwitchGate"):
+        super().__init__(0, 1, name)
+        GLOBAL_ALL_SWITCHES_LIST.append(self)
+        self.output_signal = inital_value
+    
+    def toggle(self):
+        self.output_signal = not self.output_signal
+        self.has_oputput_signal_changed = True
+    
+    def get_output_signal_value(self, ix=0):
+        return self.output_signal
+
+    def print_child_gates(self):
+        print("Child gates of(", self, "): ")
+        for c in self.child_gates_dict.get(0):
+            print(c)
+        print("")
+
+
+class AbstractGate(LogicClass):
+    def __init__(self, number_of_inputs, number_of_outputs, name: str = "AbstractGate"):
+        super().__init__(number_of_inputs, number_of_outputs, name)
+
+    def input_gates_results_set_input_signals(self, input_signal_ix): 
+        pass #Both classes have this method
+    
+    def _update_internal_gates_affected_by_last_level_signal_changes(self, input_signal_ix):
+        pass #I need this method to end the recursion when I reach a BasicGate
+
+    def _get_all_internal_basic_gates(self):
+        pass #I need this method to end the recursion when I reach a BasicGate
+
+    def get_input_signal_value(self, ix):
+        pass #Both classes have this method
+    
+    def get_output_signal_value(self, ix):
+        pass #Both classes have this method
+
+    def reset_all_signals(self):
+        pass #Both classes have this method
+
+    def compute_result_and_returns_gates_affeted_by_the_result(self):
+        pass #Both classes have this method
+    
     
 class ModuleGate(AbstractGate):
     def __init__(self, internal_gates:list[AbstractGate] = [], number_of_inputs:int =0, number_of_outputs:int =0, name = "AbstractGate"):
@@ -180,7 +162,6 @@ class ModuleGate(AbstractGate):
         self.input_signals_name:dict[int, str] = {}
         for ix in range(number_of_inputs):
             self.input_signals_list.append([])
-            self.input_signals_name[ix] = "/"
         
         self.internal_gates_affected_by_input_signal_ix:dict[int, set[("AbstractGate",int)]] = {} #* input_signal_ix -> [(first_layer_gate,flg_input_signal_ix)]
         for i in range(self.number_of_inputs):
@@ -192,10 +173,9 @@ class ModuleGate(AbstractGate):
         self.output_signals_list:list[SIGNAL] = []
         for i in range(self.number_of_outputs):
             self.output_signals_list.append(None)
-        self.output_signals_name:dict[int, str] = {}
+
         self.internal_gates_that_pilots_output_signal_ix:dict[int, (AbstractGate,int)] = {}#* output_signal_ix -> (last_layer_gate,flg_output_signal_ix)
-        for ix in range(self.number_of_outputs):
-            self.output_signals_name[ix] = "/"
+        
 
 
     def _get_input_signal(self, input_ix): #portebbero essere più signal interni = [SIGNAL, SIGNAL] pilotati dallo stesso signal ix
@@ -306,10 +286,12 @@ class BasicGate(AbstractGate):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
         return self.input_gates_dict.get(ix) != None
 
+    '''#!!!
     def add_child_gate(self, child_gate_tup:tuple[AbstractGate, int], output_signal_ix:int =0):
         if output_signal_ix not in self.child_gates_dict:
             self.child_gates_dict[output_signal_ix] = []
         self.child_gates_dict[output_signal_ix].add(child_gate_tup)
+    '''
 
     def compute_result_and_returns_gates_affeted_by_the_result(self):
         print(self)
@@ -341,6 +323,9 @@ class BasicGate(AbstractGate):
     
     def _get_output_signal(self, input_ix=0): 
         return self.output_signal
+    
+    def _get_all_internal_basic_gates(self):
+        return [self]
 
 
 
@@ -404,10 +389,11 @@ class NOT(BasicGate):
         if(input_gate != None):
             self.add_input_gate(input_gate)
 
-    def add_input_gate(self, input_gate:tuple[AbstractGate, int]):
+    def add_input_gate(self, input_gate_tup:tuple[AbstractGate, int]):
         if(self.input_gates_dict.get(0) == None):
-            self.input_gates_dict[0] = input_gate  #(input_gate, input_gate_output_signal_ix)
-            input_gate[0].add_child_gate((self, 0))  # (self, self_input_signal_ix)
+            self.input_gates_dict[0] = input_gate_tup  #(input_gate, input_gate_output_signal_ix)
+            input_gate, input_gate_output_signal = input_gate_tup
+            input_gate.add_child_gate(input_gate_output_signal, (self, 0))  # (self, self_input_signal_ix) #!!!
         else:
             print("WARNING: La gate NOT accetta SOLO 1 segnale in input - Operazione annullata")
 

@@ -38,7 +38,7 @@ class VisualPin:
     
     def unconnect_logic_pin(self):
         if(self.type == "in"):
-            self.father_visual_gate.gate.remove_input_gate(self.logic_gate_index)
+            self.father_visual_gate.gate.unconnect_input_gate_from_input_signal(self.logic_gate_index)
         else:
             print("self.type == out, non ho considerato il caso in cui si elimina un output MANUALMENTE")
 
