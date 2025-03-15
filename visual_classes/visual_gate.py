@@ -1,9 +1,14 @@
-from CONST import *
+import GLOBAL_VARIABLES as GV
 from reti_logiche import *
-from .visual_connection import *
-from .visual_pin import *
+import pygame
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .visual_connection import VisualConnection
+    from .visual_pin import VisualPin
 
 class VisualGate:
+    from .visual_connection import VisualConnection
+    from .visual_pin import VisualPin
     def __init__(self, gate: BasicGate, x: int, y: int):
         #self.visual_connections: set[VisualConnection] = set()#!!!
         self.visual_input_pins: list[VisualPin] = []
@@ -11,7 +16,7 @@ class VisualGate:
         self.gate = gate
         self.x = x 
         self.y = y
-        self.color = LIGHTBLUE
+        self.color = GV.LIGHTBLUE
         self.width = 100
         # Height based on max between inputs and outputs
         max_pins = max(gate.number_of_inputs, gate.number_of_outputs)
@@ -26,14 +31,14 @@ class VisualGate:
             spacing = self.height // (self.gate.number_of_inputs + 1)
             for i in range(self.gate.number_of_inputs):
                 y_offset = spacing * (i + 1)
-                visual_pin:VisualPin = VisualPin(self, i, 0, y_offset, self.pin_radius, "in")#!maybe coo obj? no just pass the reference of father_class
+                visual_pin:VisualPin = self.VisualPin(self, i, 0, y_offset, self.pin_radius, "in")#!maybe coo obj? no just pass the reference of father_class
                 self.visual_input_pins.append(visual_pin)
                 
         #* / output
         spacing = self.height // (self.gate.number_of_outputs + 1)
         for i in range(self.gate.number_of_outputs):
             y_offset = spacing * (i + 1)
-            visual_pin:VisualPin = VisualPin(self, i, self.width, y_offset, self.pin_radius, "out")
+            visual_pin:VisualPin = self.VisualPin(self, i, self.width, y_offset, self.pin_radius, "out")
             self.visual_output_pins.append(visual_pin)
 
     #*Gestione SPOSTAMENTO RETTANGOLO
@@ -84,7 +89,7 @@ class VisualGate:
     #*ELIMINAZIONE
     def delete_internal_logic_gate(self):
         try:
-            considered_gates.remove(self.gate)
+            GV.considered_gates.remove(self.gate)
         except:
             print("it is dumb you cant?? remove swithces")#???
         print("MAYBE WORKS, THIS SHOULD REMOVE LOGIC GATE FROM SIM")
@@ -95,15 +100,15 @@ class VisualGate:
         
         # Draw gate name
         font = pygame.font.Font(None, 24)
-        text = font.render(self.gate.name, True, BLACK)
+        text = font.render(self.gate.name, True, GV.BLACK)
         text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
         screen.blit(text, text_rect)
             
         #* Draw PINS
         for input_pin_ix in range(self.gate.number_of_inputs):
-            self.visual_input_pins[input_pin_ix].draw()
+            self.visual_input_pins[input_pin_ix].draw(screen)
         for output_pin_ix in range(self.gate.number_of_outputs):
-            self.visual_output_pins[output_pin_ix].draw()
+            self.visual_output_pins[output_pin_ix].draw(screen)
 
         #* Draw Connections
         for vc in self.get_all_visual_connections():

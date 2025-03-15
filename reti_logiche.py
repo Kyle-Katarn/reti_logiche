@@ -96,6 +96,7 @@ class AbstractGate(LogicClass):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(input_signal_ix) + " last index: " + str((self.number_of_inputs)-1))
         input_gate, input_gate_signal_ix = param
         if(self.input_gates_dict.get(input_signal_ix) != None):#!UNTESTED 
+            print("it is called from connect_input_gate_to_input_signal")
             self.remove_input_gate(input_signal_ix)#TODO SHIT NAME
         input_gate.add_child_gate((self, input_signal_ix))
         self.input_gates_dict[input_signal_ix] = param

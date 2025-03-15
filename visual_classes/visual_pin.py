@@ -1,7 +1,11 @@
-from CONST import *
+import GLOBAL_VARIABLES as GV
 from reti_logiche import *
-from .visual_connection import *
-from .visual_gate import *
+import pygame
+from typing import TYPE_CHECKING
+from math import sqrt
+if TYPE_CHECKING:
+    from .visual_gate import VisualGate
+    from .visual_connection import VisualConnection
 
 
 class VisualPin:
@@ -15,18 +19,18 @@ class VisualPin:
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.radious = rad
-        self.color = BLACK
+        self.color = GV.BLACK
 
     def visual_pin_conains_point(self, px: int, py: int):
         Dx:int = px-(self.father_visual_gate.x+self.offset_x)
         Dy:int = py-(self.father_visual_gate.y+self.offset_y)
         return sqrt(Dx**2 + Dy**2) <= self.radious * self.CONST_hitbox_scaling
 
-    def draw(self):
+    def draw(self, screen):
         if(self.type == "in"):
-            self.color = RED if self.father_visual_gate.gate.get_input_signal_value(self.logic_gate_index) else BLACK
+            self.color = GV.RED if self.father_visual_gate.gate.get_input_signal_value(self.logic_gate_index) else GV.BLACK
         else:
-            self.color = RED if self.father_visual_gate.gate.get_output_signal_value(self.logic_gate_index) else BLACK
+            self.color = GV.RED if self.father_visual_gate.gate.get_output_signal_value(self.logic_gate_index) else GV.BLACK
         pygame.draw.circle(screen, self.color, (self.father_visual_gate.x+self.offset_x, self.father_visual_gate.y+self.offset_y), self.radious)
 
     def get_coordinates(self):

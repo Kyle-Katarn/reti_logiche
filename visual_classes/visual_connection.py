@@ -1,12 +1,16 @@
-from CONST import *
+import GLOBAL_VARIABLES as GV
 from reti_logiche import *
-from .visual_gate import *
-from .visual_pin import *
+import pygame
+from math import sqrt
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .visual_gate import VisualGate
+    from .visual_pin import VisualPin
 
 
 class VisualConnection:
     def __init__(self):
-        self.color = YELLOW
+        self.color = GV.YELLOW
         self.is_self_in_connections_chosen_for_action_set:bool = False#Needed to determine the color
         self.start_pin:VisualPin = None
         self.end_pin:VisualPin = None
@@ -27,9 +31,11 @@ class VisualConnection:
 
     def set_pin(self, pin:"VisualPin"):
         if(pin.type == "out"):#todo FIX errore uscita---->entrata
+            print("outpin")
             self.start_pin = pin
             self.start_pin.pin_of_visual_connections_set.add(self)
         else:#type = in
+            print("inputpin")
             if(pin.pin_of_visual_connections_set != set()):#todo obbligo refactoring???
                 print(f"pin.pin_of_visual_connections_set: {pin.pin_of_visual_connections_set}")
                 print("WARNING, rimosso una connessione per coneterne una nuova")
@@ -38,6 +44,7 @@ class VisualConnection:
 
             self.end_pin = pin
             self.end_pin.pin_of_visual_connections_set.add(self)
+            print(f"@@@@@self.end_pin.pin_of_visual_connections_set {self.end_pin.pin_of_visual_connections_set}")
             #self.get_end_pin_visual_gate().visual_connections.add(self)#!!!
             self.connect_logic_pins()
                 
@@ -53,15 +60,16 @@ class VisualConnection:
     def draw(self, screen):
         if(self.start_pin and self.end_pin):
             self.is_connection_finalized = True
-        if(self.is_connection_finalized and (not self.start_pin.father_visual_gate in GLOBAL_visual_gates)):#!MOLTO GOOFY ma non so come rimuovere la classe in altro modo
+        if(self.is_connection_finalized and (not self.start_pin.father_visual_gate in GV.GLOBAL_visual_gates)):#!MOLTO GOOFY ma non so come rimuovere la classe in altro modo
+            print("____draw visual connection")
             self.remove_self()
         if(self.is_connection_finalized):
             self.auto_update_connection()
         if(self.start_pin):
             if(self.is_self_in_connections_chosen_for_action_set):
-                self.color = GREEN
+                self.color = GV.GREEN
             elif(not self.is_connection_finalized):
-                self.color = YELLOW
+                self.color = GV.YELLOW
             else:
                 self.color = self.start_pin.color
             #print(f"self.start_pin.color: {self.start_pin.color}")
@@ -72,6 +80,7 @@ class VisualConnection:
         #self.get_end_pin_visual_gate().visual_connections.remove(self)#!!!
         self.start_pin.pin_of_visual_connections_set.remove(self)
         self.end_pin.pin_of_visual_connections_set.remove(self)#!da errore
+        print("___remove self visual connection")
         self.unconnect_logic_pins()
 
     def connect_logic_pins(self):
@@ -80,6 +89,7 @@ class VisualConnection:
 
     def unconnect_logic_pins(self):
         #print("unconnect_logic_pins NON FA NULLA")
+        print(f"unconnect_logic_pins - visual_connection | output_pin: {self.start_pin.father_visual_gate.gate.name}")
         self.end_pin.unconnect_logic_pin()#rimuove l'input gate
         pass
 
