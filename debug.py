@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 def print_stack():
     stack_length:int = len(inspect.stack())
-
+    
     print(f"\n@@@PRINT STACK of function: {inspect.stack()[1].function}")
     for ix in range(2, stack_length):
         caller = inspect.stack()[ix]  # Get the caller's stack frame

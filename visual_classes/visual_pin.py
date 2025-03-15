@@ -1,8 +1,8 @@
 import GLOBAL_VARIABLES as GV
 from reti_logiche import *
 import pygame
-from typing import TYPE_CHECKING
 from math import sqrt
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .visual_gate import VisualGate
     from .visual_connection import VisualConnection

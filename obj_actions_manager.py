@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from visual_classes import *
+import pygame
+import GLOBAL_VARIABLES as GV
+
+from visual_classes import *
 
 class obj_action_manager():
     def __init__(self):
@@ -22,7 +23,7 @@ class obj_action_manager():
         self.are_gates_chosen_for_action_being_dragged: bool = False
         self.connections_chosen_for_action_set: set[VisualConnection] = set()
 
-    def handle_event(self, event, keys_pressed, debug_prints:False):
+    def handle_event(self, event, keys_pressed, debug_prints=False):
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             #L'evento pygame.MOUSEBUTTONDOWN si attiva solo per un singolo frame quindi il for è chiamato 1 sola volta per pressione
@@ -180,5 +181,7 @@ class obj_action_manager():
                 for vg in self.gates_chosen_for_action_set:
                     vg.visual_gate_update_position(mouse_x,mouse_y)
 
-    def draw(self):
-        pass
+    
+    def draw(self, screen):
+        if(self.connection_being_created != None):
+            self.connection_being_created.draw(screen=screen)
