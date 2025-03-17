@@ -15,4 +15,6 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
 
 GLOBAL_visual_gates:set["VisualGate"] = []
-considered_gates=[not1,not2]
+#considered_gates=[not1,not2]
+
+logic_gate_states_list:list[LogicClass] = []

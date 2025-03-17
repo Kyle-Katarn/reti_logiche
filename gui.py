@@ -5,7 +5,9 @@ from ui_elements import *
 import GLOBAL_VARIABLES as GV
 from visual_classes import *
 from obj_actions_manager import *
-from auto_placement import*
+from auto_placement import *
+
+
 
 
 # Initialize Pygame
@@ -13,7 +15,7 @@ pygame.init()
 screen = pygame.display.set_mode((GV.SCREEN_WIDTH, GV.SCREEN_HEIGHT))
 pygame.display.set_caption("Logic Gates Visualizer")
 
-considered_gates=[not1,not2]
+considered_gates=[prova]#??? GV.??
 GV.GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
 
 

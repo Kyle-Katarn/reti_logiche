@@ -77,12 +77,13 @@ def create_visual_gates(dict_gate_to_BFS_level:dict[LogicClass, int], considered
             child_gates_of_output_ix:set[tuple[AbstractGate,int]] = father_gate_child_dict[father_gate_output_ix]
             for child_gate, child_gate_input_ix in child_gates_of_output_ix:
                 visual_father_gate:VisualGate = dict_logic_to_visual_gates[father_gate]
-                visual_child_gate:VisualGate = dict_logic_to_visual_gates[child_gate]
-                start_pin:VisualPin = visual_father_gate.visual_output_pins[father_gate_output_ix]
-                end_pin:VisualPin = visual_child_gate.visual_input_pins[child_gate_input_ix]
-                new_connection:VisualConnection = VisualConnection()
-                new_connection.set_pin(start_pin)
-                new_connection.set_pin(end_pin)
+                visual_child_gate:VisualGate = dict_logic_to_visual_gates.get(child_gate, None)
+                if(visual_child_gate != None):
+                    start_pin:VisualPin = visual_father_gate.visual_output_pins[father_gate_output_ix]
+                    end_pin:VisualPin = visual_child_gate.visual_input_pins[child_gate_input_ix]
+                    new_connection:VisualConnection = VisualConnection()
+                    new_connection.set_pin(start_pin)
+                    new_connection.set_pin(end_pin)
         
     return visual_gates
         

@@ -6,21 +6,37 @@ if TYPE_CHECKING:
     from .visual_connection import VisualConnection
     from .visual_pin import VisualPin
 
+class TextClass:
+    def __init__(self, text: str, font_size:int, father_visual_gate:"VisualGate", x_offset: int, y_offset: int):
+        self.father_visual_gate = father_visual_gate
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+        self.font = pygame.font.Font(None, font_size)
+        self.text = self.font.render(text, True, GV.BLACK)
+        
+    def draw(self, screen):
+        text_rect = self.text.get_rect(center=(self.father_visual_gate.x+self.x_offset, self.father_visual_gate.y+self.y_offset))
+        screen.blit(self.text, text_rect)
+            
+
 class VisualGate:
     from .visual_connection import VisualConnection
     from .visual_pin import VisualPin
+
     def __init__(self, gate: BasicGate, x: int, y: int):
         #self.visual_connections: set[VisualConnection] = set()#!!!
         self.visual_input_pins: list[VisualPin] = []
+        self.visual_input_pins_text: list["TextClass"] = []
         self.visual_output_pins: list[VisualPin] = []
+        self.visual_output_pins_text: list["TextClass"] = []
         self.gate = gate
         self.x = x 
         self.y = y
         self.color = GV.LIGHTBLUE
-        self.width = 100
+        self.width = 150
         # Height based on max between inputs and outputs
         max_pins = max(gate.number_of_inputs, gate.number_of_outputs)
-        self.height = max(60, max_pins * 30)
+        self.height = max(60, max_pins * 45)
         self.pin_radius = 5
         self.is_dragging = False
         self.drag_offset_x = 0
@@ -33,6 +49,8 @@ class VisualGate:
                 y_offset = spacing * (i + 1)
                 visual_pin:VisualPin = self.VisualPin(self, i, 0, y_offset, self.pin_radius, "in")#!maybe coo obj? no just pass the reference of father_class
                 self.visual_input_pins.append(visual_pin)
+                pin_text:TextClass = TextClass(gate.input_signals_name[i], 40, self, -20, y_offset)
+                self.visual_input_pins_text.append(pin_text)
                 
         #* / output
         spacing = self.height // (self.gate.number_of_outputs + 1)
@@ -40,6 +58,8 @@ class VisualGate:
             y_offset = spacing * (i + 1)
             visual_pin:VisualPin = self.VisualPin(self, i, self.width, y_offset, self.pin_radius, "out")
             self.visual_output_pins.append(visual_pin)
+            pin_text:TextClass = TextClass(gate.output_signals_name[i], 40, self, self.width+20, y_offset)
+            self.visual_output_pins_text.append(pin_text)
 
     #*Gestione SPOSTAMENTO RETTANGOLO
     def visual_gate_contains_point(self, x: int, y: int) -> bool:
@@ -101,14 +121,16 @@ class VisualGate:
         # Draw gate name
         font = pygame.font.Font(None, 24)
         text = font.render(self.gate.name, True, GV.BLACK)
-        text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
+        text_rect = text.get_rect(center=(self.x + self.width//2, self.y + self.height//2))#!!!!
         screen.blit(text, text_rect)
             
         #* Draw PINS
         for input_pin_ix in range(self.gate.number_of_inputs):
             self.visual_input_pins[input_pin_ix].draw(screen)
+            self.visual_input_pins_text[input_pin_ix].draw(screen)
         for output_pin_ix in range(self.gate.number_of_outputs):
             self.visual_output_pins[output_pin_ix].draw(screen)
+            self.visual_output_pins_text[output_pin_ix].draw(screen)
 
         #* Draw Connections
         for vc in self.get_all_visual_connections():
