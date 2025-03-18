@@ -6,52 +6,57 @@ def run_simulation(max_iterations:int = 10, considered_gates:list[BasicGate] = G
     apply_SwitchGates_immediatly(considered_switches)
 
     #gates_preparing_to_switch
-    gates_preparing_to_switch:set[tuple[LogicClass,int]] = set()
-    gates_preparing_to_switch_countdown_dict:dict[LogicClass, int] = {}
-    switching_to_value_dict:dict[LogicClass, bool] = {}
+    gates_preparing_to_switch:set[LogicClass] = set()
+    gates_timer:dict[LogicClass, int] = {}
     
     for gate in considered_gates:
         gate_result:bool = gate.get_future_output_signal_value()#get result, set result a parte quando arriva a 0
         if(gate.get_output_signal_value() != gate_result):
             gates_preparing_to_switch(gate)
             if(gate_result):
-                gates_preparing_to_switch_countdown_dict[gate] = gate.low_to_high_timer
-                switching_to_value_dict[gate] = True
+                gates_timer[gate] = gate.low_to_high_timer
             else:
-                gates_preparing_to_switch_countdown_dict[gate] = gate.high_to_low_timer
-                switching_to_value_dict[gate] = False
+                gates_timer[gate] = gate.high_to_low_timer
 
     for _ in range(max_iterations):
         for gate in gates_preparing_to_switch:
-            gates_preparing_to_switch_countdown_dict[gate] -=1
-        
+            gates_timer[gate] -=1
 
+        gates_to_add:set[LogicClass] = set()
+        gates_to_remove:set[LogicClass] = set()
+        for gate in gates_preparing_to_switch:
+            if(gates_timer(gate) == 0):
+                gate.set_output_signal(not gate.get_output_signal_value())
+                gate.set_child_gates_input_signals()
+                if(gate.get_output_signal_value() == child_gate.get_future_output_signal_value()):
+                    gates_to_remove.add(gate)
+                else:
+                    #se A -> B e entrambi switchano al secondo 0, B switcha comunque(perchè ha finito il countdown)
+                    #ma ricomincia il countdown per ri switchare dato il cambiamento di input
+                    if(gate.get_output_signal_value()):
+                        gates_timer[gate] = gate.low_to_high_timer
+                    else:
+                        gates_timer[gate] = gate.high_to_low_timer
+                
+                for child_gate, child_gate_input_ix in gate.get_all_child_gates():
+                    if(child_gate not in gates_preparing_to_switch):
+                        if child_gate.get_output_signal_value() == child_gate.get_future_output_signal_value():
+                            if(child_gate in gates_to_add) : gates_to_add.remove(child_gate)
+                        else:
+                            gates_to_add.add(child_gate)
+                            if(child_gate.get_output_signal_value()):
+                                gates_timer[child_gate] = child_gate.low_to_high_timer
+                            else:
+                                gates_timer[child_gate] = child_gate.high_to_low_timer
 
-        #* child gates to remove after after second, 
-        #* child gates to add after second
-        for gate in gates_preparing_to_switch.copy():
-            if(gates_preparing_to_switch_countdown_dict[gate] ==0):
-                gate.set_result(switching_to_value_dict[gate])
-                child_gates:set[tuple[LogicClass, int]] = gate.get_all_child_gates()#?returns also input ix?? si
-                for child_gate, child_gate_input_ix in child_gates:
-                    child_gate.get_all_input_signals()
-                    if child_gate in gates_preparing_to_switch:
-                        if(gates_preparing_to_switch_countdown_dict[gate] != 0):#gate non ha finito
-                            if(child_gate.get_future_output_signal_value() != switching_to_value_dict[gate]):
-                                gates_preparing_to_switch.remove(gate) #dopo il for
-
-                        else:#gate ha appena finito
-                            if(child_gate.get_future_output_signal_value() != switching_to_value_dict[gate]):
-                                gates_preparing_to_switch.add(child_gate)
-                                switching_to_value_dict[child_gate] = child_gate.get_future_output_signal_value()
-                                if(switching_to_value_dict[child_gate] == True):
-                                    gates_preparing_to_switch_countdown_dict[child_gate] = child_gate.low_to_high
-                                else:
-                                    gates_preparing_to_switch_countdown_dict[child_gate] = child_gate.high_to_low
-        
-            gates_preparing_to_switch.remove(gate)
-            del gates_preparing_to_switch_countdown_dict[gate]
-            del switching_to_value_dict[gate]
+                    else:# child_gate in gates_preparing_to_switch
+                        if(not gates_timer(child_gate) == 0 and child_gate.get_output_signal_value() == child_gate.get_future_output_signal_value()):
+                            gates_to_remove.add(child_gate)
+                            
+        gates_preparing_to_switch.difference_update(gates_to_remove)
+        gates_preparing_to_switch.update(gates_to_add)
+        gates_to_remove.clear()
+        gates_to_add.clear()
 
 
                             
