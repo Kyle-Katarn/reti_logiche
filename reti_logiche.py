@@ -253,13 +253,15 @@ class ModuleGate(AbstractGate):
 
 
 class BasicGate(AbstractGate):
-    def __init__(self, input_gates_list:list['BasicGate'], number_of_inputs:int = 2, name:str = "GateWithInput"):
+    def __init__(self, input_gates_list:list['BasicGate'], number_of_inputs:int = 2, name:str = "BasicGate", low_to_high_timer:float =8, high_to_low_timer:float =10):
         super().__init__(number_of_inputs=number_of_inputs, number_of_outputs=1, name=name)
         GLOBAL_ALL_BASIC_GATES_LIST.append(self)
         self.input_signals_list:list[SIGNAL] = []
         self.number_of_outputs:int = 1
         self.output_signal:SIGNAL = SIGNAL()
-        self.has_oputput_signal_changed: bool = False
+        self.has_oputput_signal_changed: bool = False #todo RIMUOVERE con la nuova logica
+        self.low_to_high_timer:float = low_to_high_timer
+        self.low_to_high_timer:float = high_to_low_timer
 
         for _ in range(number_of_inputs): #inizializza la lista degli input_signals
             self.input_signals_list.append(SIGNAL())
@@ -287,22 +289,25 @@ class BasicGate(AbstractGate):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
         return self.input_gates_dict.get(ix) != None
 
-    '''#!!!
-    def add_child_gate(self, child_gate_tup:tuple[AbstractGate, int], output_signal_ix:int =0):
-        if output_signal_ix not in self.child_gates_dict:
-            self.child_gates_dict[output_signal_ix] = []
-        self.child_gates_dict[output_signal_ix].add(child_gate_tup)
-    '''
-
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         print(self)
         if(self.has_oputput_signal_changed):
             return self.child_gates_dict.get(0) #*0 BasicGate ha solo un output
         return set()
+    
+    def get_future_output_signal_value(self):
+        pass #esiste nei gate basilari
 
-    def input_gates_results_set_input_signals(self, input_signal_ix): 
+    def set_output_signal(self, res:bool):
+        self.output_signal = res
+
+    def input_gates_results_set_input_signals(self, input_signal_ix): #todo RIMUOVERE con la nuova logica, un po goofy
         input_gate, input_gate_output_signal_ix = self.input_gates_dict[input_signal_ix]
         self.input_signals_list[input_signal_ix].val = input_gate.get_output_signal_value(input_gate_output_signal_ix)
+
+    def set_child_gates_input_signals(self):
+        for child_gate, child_gate_input_ix in self.child_gates_dict[0]:
+            child_gate.set_input_signal_value(child_gate_input_ix, self.get_output_signal_value(0))
 
     def __str__(self):
         return super().__str__() + " -> " + str(self.output_signal.val)
@@ -315,6 +320,9 @@ class BasicGate(AbstractGate):
 
     def get_input_signal_value(self,ix):
         return self.input_signals_list[ix].val
+    
+    def set_input_signal_value(self, ix, val):
+        self.input_signals_list[ix] = val
     
     def get_output_signal_value(self, ix=0):
         return self.output_signal.val
@@ -335,7 +343,7 @@ class AND(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "AND"):
         super().__init__(input_gates_list, n_input_signals, name)
         
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         self.output_signal.val = True
         for s in self.input_signals_list:
@@ -343,26 +351,38 @@ class AND(BasicGate):
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         #print("and: "+str(self.output_signal.val))
         return super().compute_result_and_returns_gates_affeted_by_the_result()
-
+    
+    def get_future_output_signal_value(self):
+        res = True
+        for s in self.input_signals_list:
+            res = res and s.val
+        return res
+        
 
 class OR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "OR"):
         super().__init__(input_gates_list, n_input_signals, name)
         
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         self.output_signal.val = False
         for s in self.input_signals_list:
             self.output_signal.val = self.output_signal.val or s.val
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         return super().compute_result_and_returns_gates_affeted_by_the_result()
+    
+    def get_future_output_signal_value(self):
+        res = False
+        for s in self.input_signals_list:
+            res = res or s.val
+        return res
 
 
 class NAND(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NAND"):
         super().__init__(input_gates_list, n_input_signals, name)
         
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         self.output_signal.val = True
         for s in self.input_signals_list:
@@ -370,12 +390,19 @@ class NAND(BasicGate):
         self.output_signal.val = not self.output_signal.val
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         return super().compute_result_and_returns_gates_affeted_by_the_result()
+    
+    def get_future_output_signal_value(self):
+        res = True
+        for s in self.input_signals_list:
+            res = res and s.val
+        res = not res
+        return res
 
 class NOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NOR"):
         super().__init__(input_gates_list, n_input_signals, name)
         
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         self.output_signal.val = False
         for s in self.input_signals_list:
@@ -383,6 +410,13 @@ class NOR(BasicGate):
         self.output_signal.val = not self.output_signal.val
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         return super().compute_result_and_returns_gates_affeted_by_the_result()
+    
+    def get_future_output_signal_value(self):
+        res = False
+        for s in self.input_signals_list:
+            res = res or s.val
+        res = not res
+        return res
 
 class NOT(BasicGate):
     def __init__(self, input_gate:tuple[AbstractGate, int] = None, name: str = "NOT"):
@@ -398,22 +432,31 @@ class NOT(BasicGate):
         else:
             print("WARNING: La gate NOT accetta SOLO 1 segnale in input - Operazione annullata")
 
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         self.output_signal.val = not self.input_signals_list[0].val
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         return super().compute_result_and_returns_gates_affeted_by_the_result()
+    
+    def get_future_output_signal_value(self):
+        res = not self.input_signals_list[0].val
+        return res
 
 class XOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "XOR"):
         super().__init__(input_gates_list, n_input_signals, name)
         
-    def compute_result_and_returns_gates_affeted_by_the_result(self):
+    def compute_result_and_returns_gates_affeted_by_the_result(self): #todo RIMUOVERE con la nuova logica
         old_output_signal_val = self.output_signal.val
         number_of_true_inputs = sum(1 for signal in self.input_signals_list if signal.val)
         self.output_signal.val = (number_of_true_inputs % 2) == 1  # XOR is true when odd number of inputs are true
         self.has_oputput_signal_changed = old_output_signal_val != self.output_signal.val
         return super().compute_result_and_returns_gates_affeted_by_the_result()
+    
+    def get_future_output_signal_value(self):
+        number_of_true_inputs = sum(1 for signal in self.input_signals_list if signal.val)
+        return (number_of_true_inputs % 2) == 1  # XOR is true when odd number of inputs are true
+        
 
 #setti la gate in input ad un pin di B, A contiene B nella lista delle gates di output
 
