@@ -15,8 +15,9 @@ pygame.init()
 screen = pygame.display.set_mode((GV.SCREEN_WIDTH, GV.SCREEN_HEIGHT))
 pygame.display.set_caption("Logic Gates Visualizer")
 
-considered_gates=[prova]#??? GV.??
-GV.GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
+considered_gates=[]#??? GV.??
+#GV.GLOBAL_visual_gates = auto_placement(considered_gates=considered_gates)
+GV.GLOBAL_visual_gates = auto_placement()
 
 
 UI_ELEMENTS_SET:set[ButtonClass] = set()
