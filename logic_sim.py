@@ -40,17 +40,7 @@ def run_simulation(simulation_time:int = 10, considered_gates:list[BasicGate] = 
                 gate.set_output_signal(not gate.get_output_signal_value())
                 gate.set_child_gates_input_signals()#sia ModuleGate che BasicGate
                 print(f"GATE SWITCHED: {gate}")
-                if(gate.get_output_signal_value() == gate.get_future_output_signal_value()):
-                    gates_to_remove.add(gate)
-                else:
-                    #se A -> B e entrambi switchano al secondo 0, B switcha comunque(perchè ha finito il countdown)
-                    #ma ricomincia il countdown per ri switchare dato il cambiamento di input
-                    if(gate.get_future_output_signal_value()):
-                        gates_timer[gate] = gate.low_to_high_timer
-                        print(f"ADDED GATE == 0: {child_gate.name}, timer: {child_gate.low_to_high_timer}, switching to: 1")
-                    else:
-                        gates_timer[gate] = gate.high_to_low_timer
-                        print(f"ADDED GATE == 0: {child_gate.name}, timer: {child_gate.high_to_low_timer}, switching to: 0")
+                gates_to_remove.add(gate)
                 
                 child_basic_gates:set[BasicGate] = set()
                 for child_gate, child_gate_input_ix in gate.get_all_child_gates():
