@@ -57,7 +57,7 @@ def run_simulation(simulation_time:int = 10, considered_gates:list[BasicGate] = 
                     child_basic_gates.update(child_gate.get_all_basic_gates_connected_to_input_signal(child_gate_input_ix))
 
                 for child_gate in child_basic_gates:#* ITERA SU TUTTI I FIGLI DEL GATE CHE è APPENA COMMUATO
-                    if(child_gate not in gates_preparing_to_switch or  gates_timer[gate] >0):#* AGGIUNGE UN NUOVO GATE CHE DOVRA' COMMUTARE
+                    if(child_gate not in gates_preparing_to_switch or gates_timer[gate] == 0):#* AGGIUNGE UN NUOVO GATE CHE DOVRA' COMMUTARE
                         #print(f"child_gate {child_gate}, future signal: {child_gate.get_future_output_signal_value()}")
                         #print(f"not2: {not2.get_output_signal_value()}, {switch1.get_output_signal_value()}")#?????? T T
                         if child_gate.get_output_signal_value() == child_gate.get_future_output_signal_value():
