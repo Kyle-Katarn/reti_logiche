@@ -269,8 +269,8 @@ class BasicGate(AbstractGate):
             raise IndexError("ERRORE: Input signal index out of range, your index: " + str(ix) + " last index: " + (str(self.number_of_inputs)-1))
         return self.input_gates_dict.get(ix) != None
 
-    def get_future_output_signal_value(self):
-        pass #esiste nei gate basilari
+    def compute_result(self, considered_signals:list[bool]):#!!!
+        pass#esiste nei gate basilari
 
     def set_output_signal(self, res:bool):
         self.output_signal.val = res
@@ -290,6 +290,12 @@ class BasicGate(AbstractGate):
 
     def get_input_signal_value(self,ix):
         return self.input_signals_list[ix].val
+    
+    def get_input_signals_value_list(self):
+        ris:list[bool] = []
+        for ix in range(self.number_of_inputs):
+            ris.append(self.get_input_signal_value(ix))
+        return ris
     
     def set_input_signal_value(self, ix, val):
         self.input_signals_list[ix].val = val
@@ -312,14 +318,15 @@ class BasicGate(AbstractGate):
 
 
 
+
 class AND(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "AND", low_to_high_timer:float =10, high_to_low_timer:float =10):
         super().__init__(input_gates_list, n_input_signals, name, low_to_high_timer, high_to_low_timer)
     
-    def get_future_output_signal_value(self):
+    def compute_result(self, considered_signals):
         res = True
-        for s in self.input_signals_list:
-            res = res and s.val
+        for s in considered_signals:
+            res = res and s
         return res
         
 
@@ -327,10 +334,10 @@ class OR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "OR", low_to_high_timer:float =10, high_to_low_timer:float =10):
         super().__init__(input_gates_list, n_input_signals, name, low_to_high_timer, high_to_low_timer)
     
-    def get_future_output_signal_value(self):
+    def compute_result(self, considered_signals):
         res = False
-        for s in self.input_signals_list:
-            res = res or s.val
+        for s in considered_signals:
+            res = res or s
         return res
 
 
@@ -338,10 +345,10 @@ class NAND(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NAND", low_to_high_timer:float =10, high_to_low_timer:float =10):
         super().__init__(input_gates_list, n_input_signals, name, low_to_high_timer, high_to_low_timer)
     
-    def get_future_output_signal_value(self):
+    def compute_result(self, considered_signals):
         res = True
-        for s in self.input_signals_list:
-            res = res and s.val
+        for s in considered_signals:
+            res = res and s
         res = not res
         return res
 
@@ -349,10 +356,10 @@ class NOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "NOR", low_to_high_timer:float =10, high_to_low_timer:float =10):
         super().__init__(input_gates_list, n_input_signals, name, low_to_high_timer, high_to_low_timer)
     
-    def get_future_output_signal_value(self):
+    def compute_result(self, considered_signals):
         res = False
-        for s in self.input_signals_list:
-            res = res or s.val
+        for s in considered_signals:
+            res = res or s
         res = not res
         return res
 
@@ -370,16 +377,16 @@ class NOT(BasicGate):
         else:
             print("WARNING: La gate NOT accetta SOLO 1 segnale in input - Operazione annullata")
     
-    def get_future_output_signal_value(self):
-        res = not self.input_signals_list[0].val
+    def compute_result(self, considered_signals):
+        res = not considered_signals[0]
         return res
 
 class XOR(BasicGate):
     def __init__(self, input_gates_list:list[AbstractGate] = [], n_input_signals:int = 2, name: str = "XOR", low_to_high_timer:float =10, high_to_low_timer:float =10):
         super().__init__(input_gates_list, n_input_signals, name, low_to_high_timer, high_to_low_timer)
     
-    def get_future_output_signal_value(self):
-        number_of_true_inputs = sum(1 for signal in self.input_signals_list if signal.val)
+    def compute_result(self, considered_signals):
+        number_of_true_inputs = sum(1 for signal in considered_signals if signal.val)
         return (number_of_true_inputs % 2) == 1  # XOR is true when odd number of inputs are true
     
 
